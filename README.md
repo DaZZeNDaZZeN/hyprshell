@@ -51,19 +51,23 @@ Install all required packages using `pacman`:
 ```bash
 sudo pacman -S --needed \
   hyprland xdg-desktop-portal-hyprland hyprcursor \
-  quickshell \
+  quickshell hyprshutdown \
   pipewire wireplumber playerctl brightnessctl \
   networkmanager bluez bluez-utils upower \
   wl-clipboard grim slurp wf-recorder imagemagick \
   jq curl python \
-  qt6ct-kde breeze breeze-icons breeze-gtk kconfig \
+  breeze breeze-icons breeze-gtk kconfig \
   noto-fonts noto-fonts-cjk noto-fonts-emoji awesome-terminal-fonts \
   kitty firefox dolphin
 ```
 
-> [!NOTE]
-> If `qt6ct-kde` is not in your repository (standard Arch outside CachyOS), install `qt6ct` instead.
-> Ensure system services are enabled:
+> [!IMPORTANT]
+> Install **`qt6ct-kde`** from the AUR (or CachyOS repositories) rather than standard `qt6ct` — vanilla `qt6ct` does not support `KColorScheme` (`.colors`) files and applies Qt/KDE theming inconsistently:
+> ```bash
+> paru -S qt6ct-kde
+> # or: yay -S qt6ct-kde
+> ```
+> Also ensure system services are enabled:
 > ```bash
 > sudo systemctl enable --now NetworkManager bluetooth upower
 > ```
