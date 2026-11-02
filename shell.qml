@@ -1,4 +1,3 @@
-//@ pragma Env LIBGL_ALWAYS_SOFTWARE=1
 //@ pragma UseQApplication
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 

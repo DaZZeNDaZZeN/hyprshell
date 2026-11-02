@@ -10,8 +10,29 @@ hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_MENU_PREFIX", "arch-")
 hl.env("HYPRCURSOR_THEME", "Nordzy-hyprcursors") -- cursor theme must be located at ~/.local/share/icons/
-hl.env("LIBGL_ALWAYS_SOFTWARE", "1")
-hl.env("HYPRCURSOR_SIZE", "24")
+
+-- Automatically use software rendering only on Virtio/QEMU VM GPUs; real GPUs use hardware acceleration.
+local function is_virtio_vm()
+	for _, p in ipairs({
+		"/sys/class/drm/card0/device/uevent",
+		"/sys/class/drm/card1/device/uevent",
+		"/sys/class/dmi/id/sys_vendor",
+	}) do
+		local f = io.open(p, "r")
+		if f then
+			local s = f:read("*a") or ""
+			f:close()
+			if s:find("virtio") or s:find("QEMU") then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+if is_virtio_vm() then
+	hl.env("LIBGL_ALWAYS_SOFTWARE", "1")
+end
 
 -----------------------
 ---- LOOK AND FEEL ----
