@@ -124,17 +124,182 @@ run("gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", cursor)
 run("gsettings", "set", "org.gnome.desktop.interface", "cursor-size", csize)
 run("gsettings", "set", "org.gnome.desktop.interface", "accent-color", "slate")
 
-# ---------------- Qt (qt6ct / qt5ct) ----------------
+# ---------------- KColorScheme (.colors) + Qt (qt6ct / qt5ct) + KDE ----------------
 base = surface
 alt = mix(surface, text, 0.05)
 btn = mix(bg, text, 0.07)
 light = mix(btn, "#ffffff", 0.3)
 mid = mix(btn, "#000000", 0.2)
 dk = mix(btn, "#000000", 0.4)
+c = lambda h: ",".join(str(x) for x in rgb(h))
+inact_fg = c(sub)
+pos_fg = "158,206,106"
+neu_fg = "224,175,104"
+neg_fg = "247,118,142"
+
+kcolorscheme = f"""[ColorEffects:Disabled]
+Color={c(bg)}
+ColorAmount=0.5
+ColorEffect=0
+ContrastAmount=0.65
+ContrastEffect=1
+IntensityAmount=0.1
+IntensityEffect=2
+
+[ColorEffects:Inactive]
+ChangeSelectionColor=true
+Color={c(bg)}
+ColorAmount=0.025
+ColorEffect=2
+ContrastAmount=0.1
+ContrastEffect=2
+Enable=false
+IntensityAmount=0
+IntensityEffect=0
+
+[Colors:Button]
+BackgroundAlternate={c(alt)}
+BackgroundNormal={c(btn)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:Complementary]
+BackgroundAlternate={c(surface)}
+BackgroundNormal={c(bg)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:Header]
+BackgroundAlternate={c(surface)}
+BackgroundNormal={c(bg)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:Header][Inactive]
+BackgroundAlternate={c(surface)}
+BackgroundNormal={c(bg)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:Selection]
+BackgroundAlternate={c(accent)}
+BackgroundNormal={c(accent)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(on_accent)}
+ForegroundInactive={c(on_accent)}
+ForegroundLink={c(on_accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(on_accent)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(on_accent)}
+
+[Colors:Tooltip]
+BackgroundAlternate={c(alt)}
+BackgroundNormal={c(surface)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:View]
+BackgroundAlternate={c(alt)}
+BackgroundNormal={c(surface)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[Colors:Window]
+BackgroundAlternate={c(surface)}
+BackgroundNormal={c(bg)}
+DecorationFocus={c(accent)}
+DecorationHover={c(accent)}
+ForegroundActive={c(accent)}
+ForegroundInactive={inact_fg}
+ForegroundLink={c(accent)}
+ForegroundNegative={neg_fg}
+ForegroundNeutral={neu_fg}
+ForegroundNormal={c(text)}
+ForegroundPositive={pos_fg}
+ForegroundVisited={c(mix(accent, text, 0.35))}
+
+[General]
+AccentColor={c(accent)}
+ColorScheme=Hyprshell
+Name=Hyprshell
+shadeSortColumn=true
+
+[KDE]
+contrast=4
+
+[WM]
+activeBackground={c(bg)}
+activeBlend={c(text)}
+activeForeground={c(text)}
+inactiveBackground={c(bg)}
+inactiveBlend={inact_fg}
+inactiveForeground={inact_fg}
+"""
+
+kcs_dir = home / ".local/share/color-schemes"
+kcs_dir.mkdir(parents=True, exist_ok=True)
+kcs_file = kcs_dir / "Hyprshell.colors"
+kcs_file.write_text(kcolorscheme)
+
+qt6_colors_dir = home / ".config/qt6ct/colors"
+qt6_colors_dir.mkdir(parents=True, exist_ok=True)
+(qt6_colors_dir / "Hyprshell.colors").write_text(kcolorscheme)
+
 active = [text, btn, light, mix(btn, "#ffffff", 0.15), dk, mid, text, "#ffffff", text, base, bg,
           "#000000", accent, on_accent, accent, mix(accent, text, 0.5), alt, "#000000", surface, text, sub, accent]
 disabled = [mix(text, bg, 0.5)] + active[1:6] + [mix(text, bg, 0.5)] + active[7:8] + [mix(text, bg, 0.5)] + active[9:]
-fmt = lambda l: ", ".join("#ff" + c.lstrip("#") for c in l)
+fmt = lambda l: ", ".join("#ff" + c_.lstrip("#") for c_ in l)
 scheme = f"[ColorScheme]\nactive_colors={fmt(active)}\ndisabled_colors={fmt(disabled)}\ninactive_colors={fmt(active)}\n"
 for q in ("qt6ct", "qt5ct"):
     p = home / ".config" / q
@@ -148,7 +313,9 @@ for q in ("qt6ct", "qt5ct"):
         if re.search(rf"^{k}=.*$", s, re.M):
             return re.sub(rf"^{k}=.*$", f"{k}={v}", s, flags=re.M)
         return s.replace("[Appearance]", f"[Appearance]\n{k}={v}", 1)
-    s = sk(s, "color_scheme_path", str(p / "style-colors.conf"))
+    # Apply the KColorScheme (.colors) file in qt6ct; qt5ct uses style-colors.conf
+    scheme_path = str(kcs_file) if q == "qt6ct" else str(p / "style-colors.conf")
+    s = sk(s, "color_scheme_path", scheme_path)
     s = sk(s, "custom_palette", "true")
     s = sk(s, "icon_theme", icon)
     conf.write_text(s)
@@ -157,7 +324,7 @@ for q in ("qt6ct", "qt5ct"):
 def kw(group, key, val, file="kdeglobals"):
     run("kwriteconfig6", "--file", file, "--group", group, "--key", key, val)
 
-c = lambda h: ",".join(str(x) for x in rgb(h))
+kw("General", "ColorScheme", "Hyprshell")
 kw("General", "AccentColor", c(accent))
 kw("Icons", "Theme", icon)
 kw("Colors:Window", "BackgroundNormal", c(bg))

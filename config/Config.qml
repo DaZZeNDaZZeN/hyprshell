@@ -31,12 +31,15 @@ Singleton {
 
             // ---- appearance ----
             property string themeMode: "dark"          // dark | light
-            property string staticTheme: "none"        // none | nord | gruvbox | mocha | rosepine
+            property string staticTheme: "none"        // none | nord | gruvbox | mocha | rosepine | latte
             property string accentMode: "wallpaper"    // wallpaper | custom
             property string customAccent: "#7aa2f7"
             property string wallpaperAccent: "#7aa2f7"
             property int radius: 16
             property real panelOpacity: 0.92
+            property real barOpacity: 0.92
+            property real dockOpacity: 0.92
+            property real widgetsOpacity: 0.92
             property real animSpeed: 1.0               // 1 = default, 0 = instant
             property string fontFamily: "Noto Sans"
             property real fontScale: 1.0
@@ -50,6 +53,7 @@ Singleton {
             property string barPosition: "top"         // top | bottom
             property bool barFloating: true
             property bool barAutoHide: false
+            property bool barKeepOnEmpty: false
             property int barHeight: 38
             property bool barShowTitle: true
             property bool barShowTray: true
@@ -57,12 +61,14 @@ Singleton {
             property bool barShowLayout: true
             property bool barClock24h: true
             property bool barSeconds: false
+            property int barScrollStep: 5
             property string barMonitors: "all"         // all | primary
 
             // ---- dock ----
             property bool dockEnabled: true
             property bool dockFloating: true
             property bool dockAutoHide: true
+            property bool dockKeepOnEmpty: true
             property int dockIconSize: 44
             property var dockPinned: ["firefox", "org.kde.dolphin", "kitty"]
 
@@ -81,7 +87,7 @@ Singleton {
 
             // ---- desktop widgets ----
             property bool widgetsEnabled: true
-            property string widgetsPosition: "top-left" // top-left | top-right | bottom-left | bottom-right | center
+            property string widgetsPosition: "top-left" // top-left | top-center | top-right | left-center | center | right-center | bottom-left | bottom-center | bottom-right
             property bool widgetClock: true
             property bool widgetWeather: true
             property bool widgetSystem: true

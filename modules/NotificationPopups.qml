@@ -19,11 +19,11 @@ Variants {
         readonly property bool top: Config.o.notifPosition.startsWith("top")
         anchors { top: win.top; bottom: !win.top; right: win.right; left: !win.right }
         implicitWidth: 392
-        implicitHeight: Math.max(1, stack.height + 12)
+        implicitHeight: Math.max(1, stack.implicitHeight + 12)
         margins { top: Config.o.barEnabled && Config.o.barPosition === "top" && win.top ? 52 : 8; bottom: 8; right: 8; left: 8 }
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
-        visible: stack.height > 1
+        visible: win.mine && Notifs.popups.length > 0
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "hyprshell-notifications"
         mask: Region { item: stack }
@@ -34,21 +34,18 @@ Variants {
             x: win.right ? parent.width - width - 4 : 4
             y: win.top ? 0 : undefined
             anchors.bottom: win.top ? undefined : parent.bottom
-            spacing: 0
+            spacing: 10
             Repeater {
-                model: win.mine ? Notifs.items.slice(0, 8) : []
+                model: win.mine ? Notifs.popups.slice(0, 6) : []
                 delegate: Item {
                     id: slot
                     required property var modelData
-                    readonly property bool show: modelData.popup && sawMe
-                    property bool sawMe: false
+                    property bool entered: false
                     width: stack.width
-                    height: show ? card.height + 10 : 0
-                    clip: true
-                    opacity: show ? 1 : 0
-                    visible: height > 0.5
-                    Component.onCompleted: sawMe = true
-                    Behavior on height { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
+                    height: card.implicitHeight
+                    implicitHeight: card.implicitHeight
+                    opacity: entered ? 1 : 0
+                    Component.onCompleted: entered = true
                     Behavior on opacity { NumberAnimation { duration: Theme.anim } }
                     NotifCard {
                         id: card
@@ -56,7 +53,7 @@ Variants {
                         popupMode: true
                         width: parent.width
                         height: implicitHeight
-                        x: slot.show ? 0 : (win.right ? 60 : -60)
+                        x: slot.entered ? 0 : (win.right ? 48 : -48)
                         Behavior on x { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
                     }
                 }

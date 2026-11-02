@@ -30,14 +30,48 @@ Singleton {
         "cn": "Chinese"
     })
 
+    function codeForName(name) {
+        if (!name) return "";
+        const low = name.toLowerCase();
+        // Check if any entry in layouts matches the full name
+        for (const item of layouts) {
+            if (item && item.name && item.name.toLowerCase() === low) return item.code;
+        }
+        // Check against codeNames values
+        for (const k in codeNames) {
+            if (low === codeNames[k].toLowerCase() || low.startsWith(codeNames[k].toLowerCase()))
+                return k.toUpperCase();
+        }
+        const known = {
+            "english (uk)": "GB",
+            "english (us)": "US",
+            "english": "US",
+            "russian": "RU",
+            "kazakh": "KZ",
+            "german": "DE",
+            "french": "FR",
+            "spanish": "ES",
+            "italian": "IT",
+            "ukrainian": "UA",
+            "polish": "PL",
+            "turkish": "TR",
+            "japanese": "JP",
+            "korean": "KR",
+            "chinese": "CN"
+        };
+        for (const k in known) if (low.startsWith(k)) return known[k];
+        return name.substring(0, 2).toUpperCase();
+    }
+
     readonly property string short: {
+        if (layout) {
+            const c = codeForName(layout);
+            if (c) return c;
+        }
         if (layouts.length > activeIndex && layouts[activeIndex]) {
             return layouts[activeIndex].code;
         }
-        const known = { "english": "EN", "russian": "RU", "kazakh": "KZ" };
-        const l = layout.toLowerCase();
-        for (const k in known) if (l.startsWith(k)) return known[k];
-        return layout ? layout.substring(0, 2).toUpperCase() : "";
+        return "";
     }
     property bool caps: false
     property bool num: false
@@ -85,11 +119,15 @@ Singleton {
         function onRawEvent(ev) {
             if (ev.name !== "activelayout") return;
             const p = ev.data.split(",");
-            const name = p.slice(1).join(",");
+            const name = p.slice(1).join(",").trim();
+            if (!name) return;
             const changed = name !== root.layout;
             root.layout = name;
+            const code = root.codeForName(name);
+            const matchIdx = root.layouts.findIndex(l => l.code === code || l.name.toLowerCase() === name.toLowerCase());
+            if (matchIdx >= 0) root.activeIndex = matchIdx;
             root.refresh();
-            if (changed) Osd.show("layout", "\uf11c", root.short, -1, name);
+            if (changed) Osd.show("layout", "\uf11c", code || root.short, -1, name);
         }
     }
 

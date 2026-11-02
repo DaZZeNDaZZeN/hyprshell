@@ -52,8 +52,11 @@ Singleton {
     readonly property color ok:       "#58c27d"
 
     readonly property real opacity: Config.o.panelOpacity
-    readonly property color panel:  Qt.rgba(bg.r, bg.g, bg.b, opacity)
-    readonly property color card:   Qt.rgba(surface.r, surface.g, surface.b, Math.min(1, opacity + 0.05))
+    readonly property color panel:        Qt.rgba(bg.r, bg.g, bg.b, opacity)
+    readonly property color barPanel:     Qt.rgba(bg.r, bg.g, bg.b, Config.o.barOpacity)
+    readonly property color dockPanel:    Qt.rgba(bg.r, bg.g, bg.b, Config.o.dockOpacity)
+    readonly property color widgetsPanel: Qt.rgba(bg.r, bg.g, bg.b, Config.o.widgetsOpacity)
+    readonly property color card:         Qt.rgba(surface.r, surface.g, surface.b, Math.min(1, opacity + 0.05))
 
     readonly property int radius:   pick("radius", Config.o.radius)
     readonly property int radiusS:  Math.max(4, Math.round(radius * 0.6))

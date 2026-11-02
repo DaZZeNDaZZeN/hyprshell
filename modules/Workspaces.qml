@@ -5,24 +5,35 @@ import qs.config
 import qs.components
 import qs.services
 
-// Ten persistent workspaces, 1-10. Active one is stretched and tinted with the accent.
+// Persistent workspaces 1-10, plus any existing workspace > 10. Active one is stretched and tinted with the accent.
 Row {
     id: root
     property var screenObj
     readonly property var mon: Hyprland.monitorFor(screenObj)
     readonly property int activeId: mon?.activeWorkspace?.id ?? 1
+    readonly property var wsList: {
+        const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const add = id => {
+            if (typeof id === "number" && id > 10 && !ids.includes(id)) ids.push(id);
+        };
+        add(root.activeId);
+        for (const w of Hyprland.workspaces.values) if (w) add(w.id);
+        for (const t of Hyprland.toplevels.values) if (t && t.workspace) add(t.workspace.id);
+        ids.sort((a, b) => a - b);
+        return ids;
+    }
     spacing: 4
 
     Repeater {
-        model: 10
+        model: root.wsList
         delegate: Rectangle {
             id: cell
-            required property int index
-            readonly property int wsId: index + 1
+            required property var modelData
+            readonly property int wsId: modelData
             readonly property bool active: root.activeId === wsId
             readonly property bool occupied: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === wsId)
             height: 22
-            width: active ? 34 : 22
+            width: active ? 34 : (wsId >= 10 ? 24 : 22)
             radius: height / 2
             anchors.verticalCenter: parent.verticalCenter
             color: active ? Theme.accent : (ma.containsMouse ? Theme.surface3 : (occupied ? Theme.surface2 : "transparent"))
@@ -42,8 +53,8 @@ Row {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + cell.wsId + " })")
-                onWheel: w => Hyprland.dispatch("hl.dsp.focus({ workspace = \"e" + (w.angleDelta.y > 0 ? "-1" : "+1") + "\" })")
+                onClicked: Panels.switchWorkspace(cell.wsId)
+                onWheel: w => Panels.switchWorkspace(w.angleDelta.y > 0 ? "e-1" : "e+1")
             }
         }
     }

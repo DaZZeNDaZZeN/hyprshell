@@ -1,11 +1,12 @@
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import QtQuick
 import qs.config
 import qs.components
 import qs.services
 
-// Application dock: pinned + running apps, floating or attached, optional auto-hide.
+// Application dock: pinned + running apps, floating or attached, optional auto-hide, window count badge & live hover miniatures.
 Variants {
     model: Config.o.dockEnabled ? Quickshell.screens.slice(0, 1) : []
 
@@ -19,12 +20,20 @@ Variants {
         readonly property int gap: floating ? 8 : 0
         readonly property int dockH: isz + pad * 2 + 6
         readonly property bool autoHide: Config.o.dockAutoHide
+        readonly property int activeWsId: Hyprland.monitorFor(win.screen)?.activeWorkspace?.id ?? 1
+        readonly property bool wsEmpty: ToplevelManager.toplevels.values.length === 0
+            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId)
         property bool pointerInside: false
         property string menuKey: ""
-        readonly property bool hidden: autoHide && !pointerInside && menuKey === "" && !Panels.active
+        property string hoverKey: ""
+        property real hoverCenterX: win.width / 2
+        readonly property var hoveredEntry: entries.find(e => e.key === hoverKey) ?? null
+        readonly property bool previewShown: menuKey === "" && hoveredEntry !== null && hoveredEntry.tops.length > 0
+        readonly property int extraTopSpace: 196
+        readonly property bool hidden: autoHide && !(Config.o.dockKeepOnEmpty && wsEmpty) && !pointerInside && menuKey === "" && !previewShown && !Panels.active
 
         anchors { left: true; right: true; bottom: true }
-        implicitHeight: dockH + gap * 2 + 70
+        implicitHeight: dockH + gap * 2 + extraTopSpace
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: autoHide ? 0 : dockH + gap * 2
         WlrLayershell.layer: WlrLayer.Top
@@ -52,14 +61,136 @@ Variants {
             Config.o.dockPinned = cur;
         }
 
-        Timer { id: hideDelay; interval: 500; onTriggered: win.pointerInside = false }
+        Timer { id: hideDelay; interval: 500; onTriggered: { win.pointerInside = false; win.hoverKey = ""; } }
+        Timer { id: previewHideDelay; interval: 200; onTriggered: if (!previewHover.hovered) win.hoverKey = "" }
         HoverHandler {
-            onHoveredChanged: { if (hovered) { hideDelay.stop(); win.pointerInside = true; } else { hideDelay.restart(); win.menuKey = ""; } }
+            onHoveredChanged: {
+                if (hovered) { hideDelay.stop(); win.pointerInside = true; }
+                else { hideDelay.restart(); previewHideDelay.restart(); win.menuKey = ""; }
+            }
         }
         Item { id: trigger; width: Math.max(420, dock.width); height: 3; anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter }
-        Item { id: maskItem; x: dock.x; y: dock.y - 70; width: dock.width; height: dock.height + 70 }
+        Item {
+            id: maskItem
+            x: win.previewShown ? Math.min(dock.x, previewCard.x - 8) : dock.x
+            y: win.previewShown || win.menuKey !== "" ? 0 : dock.y - 44
+            width: win.previewShown ? Math.max(dock.x + dock.width, previewCard.x + previewCard.width + 8) - x : dock.width
+            height: win.height - y
+        }
 
         Component.onCompleted: Panels.registry["dock"] = { holder: dock }
+
+        // Live window miniatures popup on hover
+        Rectangle {
+            id: previewCard
+            visible: opacity > 0.01 && win.hoveredEntry !== null && win.hoveredEntry.tops.length > 0
+            opacity: win.previewShown ? 1 : 0
+            scale: win.previewShown ? 1 : 0.95
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+            Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            width: previewRow.implicitWidth + 20
+            height: 158
+            x: Math.min(win.width - width - 12, Math.max(12, win.hoverCenterX - width / 2))
+            y: dock.y - height - 10
+            Behavior on x { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            radius: Theme.radiusL
+            color: Theme.card
+            border.width: 1
+            border.color: Theme.border
+
+            HoverHandler {
+                id: previewHover
+                onHoveredChanged: {
+                    if (hovered) {
+                        hideDelay.stop();
+                        previewHideDelay.stop();
+                        win.pointerInside = true;
+                    } else {
+                        previewHideDelay.restart();
+                    }
+                }
+            }
+
+            Row {
+                id: previewRow
+                anchors.centerIn: parent
+                spacing: 10
+                Repeater {
+                    model: win.previewShown && win.hoveredEntry ? win.hoveredEntry.tops.slice(0, 5) : []
+                    delegate: Rectangle {
+                        id: thumbCard
+                        required property var modelData
+                        width: 188
+                        height: 138
+                        radius: Theme.radius
+                        color: thumbMa.containsMouse ? Theme.surface3 : Theme.surface2
+                        border.width: modelData.activated ? 2 : 1
+                        border.color: modelData.activated ? Theme.accent : (thumbMa.containsMouse ? Theme.accentSoft : Theme.border)
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        clip: true
+
+                        // Header with title + close
+                        Item {
+                            id: thumbHeader
+                            x: 8; y: 5; width: parent.width - 16; height: 22
+                            Label {
+                                anchors { left: parent.left; right: closeWinBtn.left; rightMargin: 4; verticalCenter: parent.verticalCenter }
+                                text: thumbCard.modelData.title || thumbCard.modelData.appId || "Window"
+                                font.pixelSize: Theme.fsS
+                                font.weight: Font.Medium
+                                color: Theme.text
+                            }
+                            Rectangle {
+                                id: closeWinBtn
+                                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                                width: 18; height: 18; radius: 9
+                                color: closeMa.containsMouse ? Theme.danger : "transparent"
+                                Icon {
+                                    anchors.centerIn: parent
+                                    text: "\uf00d"
+                                    font.pixelSize: 9
+                                    tint: closeMa.containsMouse ? Theme.onAccent : Theme.subtext
+                                }
+                                MouseArea {
+                                    id: closeMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: thumbCard.modelData.close()
+                                }
+                            }
+                        }
+
+                        // Static window miniature via ScreencopyView (captures single frame once on hover)
+                        Rectangle {
+                            anchors { left: parent.left; right: parent.right; top: thumbHeader.bottom; bottom: parent.bottom; margins: 6; topMargin: 2 }
+                            radius: Theme.radiusS
+                            color: Theme.bg
+                            clip: true
+                            ScreencopyView {
+                                id: scv
+                                anchors.fill: parent
+                                captureSource: win.previewShown ? thumbCard.modelData : null
+                                live: false
+                                constraintSize: Qt.size(280, 170)
+                            }
+                        }
+
+                        MouseArea {
+                            id: thumbMa
+                            anchors { left: parent.left; right: parent.right; top: thumbHeader.bottom; bottom: parent.bottom }
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                thumbCard.modelData.activate();
+                                win.hoverKey = "";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Rectangle {
             id: dock
             readonly property real contentW: row.implicitWidth + win.pad * 2
@@ -72,7 +203,7 @@ Variants {
             opacity: win.hidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.anim } }
             radius: win.floating ? Theme.radiusL : 0
-            color: Theme.panel
+            color: Theme.dockPanel
             border.width: win.floating ? 1 : 0
             border.color: Theme.border
 
@@ -86,7 +217,8 @@ Variants {
                         id: item
                         required property var modelData
                         readonly property var entry: Apps.lookup(modelData.id)
-                        readonly property bool running: modelData.tops.length > 0
+                        readonly property int winCount: modelData.tops.length
+                        readonly property bool running: winCount > 0
                         readonly property bool focused: running && modelData.tops.some(t => t.activated)
                         width: win.isz + 8; height: win.isz + 6
 
@@ -107,20 +239,59 @@ Variants {
                             Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
                             Behavior on y { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
                         }
+
+                        // Open window count badge
                         Rectangle {
+                            visible: item.winCount > 0
+                            anchors { right: parent.right; top: parent.top; rightMargin: 0; topMargin: -2 }
+                            height: 18
+                            width: Math.max(18, countLbl.implicitWidth + 8)
+                            radius: 9
+                            color: item.focused ? Theme.accent : Theme.surface3
+                            border.width: 1.5
+                            border.color: Theme.dockPanel
+                            Label {
+                                id: countLbl
+                                anchors.centerIn: parent
+                                text: item.winCount
+                                font.pixelSize: 10
+                                font.weight: Font.Bold
+                                color: item.focused ? Theme.onAccent : Theme.text
+                            }
+                        }
+
+                        // Running indicator bar/dots at bottom
+                        Row {
                             visible: item.running
                             anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: -1 }
-                            width: item.focused ? 18 : 6; height: 4; radius: 2
-                            color: item.focused ? Theme.accent : Theme.subtext
-                            Behavior on width { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
-                            Behavior on color { ColorAnimation { duration: Theme.anim } }
+                            spacing: 3
+                            Repeater {
+                                model: Math.min(item.winCount, 4)
+                                delegate: Rectangle {
+                                    required property int index
+                                    width: index === 0 && item.focused ? 12 : 5
+                                    height: 4
+                                    radius: 2
+                                    color: item.focused ? Theme.accent : Theme.subtext
+                                    Behavior on width { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
+                                }
+                            }
                         }
+
                         MouseArea {
                             id: ma
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                             cursorShape: Qt.PointingHandCursor
+                            onEntered: {
+                                previewHideDelay.stop();
+                                win.hoverCenterX = dock.x + row.x + item.x + item.width / 2;
+                                win.hoverKey = item.modelData.key;
+                            }
+                            onExited: {
+                                previewHideDelay.restart();
+                            }
                             onClicked: m => {
                                 if (m.button === Qt.RightButton) { win.menuKey = win.menuKey === item.modelData.key ? "" : item.modelData.key; return; }
                                 win.menuKey = "";
@@ -133,8 +304,9 @@ Variants {
                                 }
                             }
                         }
+                        // Simple tooltip only when app is not running (running apps show the live miniatures card)
                         Rectangle {
-                            visible: ma.containsMouse && win.menuKey === ""
+                            visible: ma.containsMouse && !item.running && win.menuKey === ""
                             anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.top; bottomMargin: 8 }
                             width: tip.implicitWidth + 20; height: 26; radius: 8; color: Theme.card; border.width: 1; border.color: Theme.border
                             Label { id: tip; anchors.centerIn: parent; text: item.entry?.name ?? item.modelData.id; font.pixelSize: Theme.fsS + 1 }

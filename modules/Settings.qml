@@ -92,7 +92,7 @@ Variants {
                         Segmented { options: [{ label: "Dark", value: "dark" }, { label: "Light", value: "light" }]; current: win.o.themeMode
                             onPicked: v => { win.o.themeMode = v; win.o.staticTheme = "none"; } } }
                     SettingRow { title: "Static theme"; desc: "Pick a fixed palette instead of the neutral base."
-                        Row { spacing: 6
+                        Flow { width: 410; spacing: 6
                             Repeater { model: Theme.staticNames
                                 delegate: Chip { required property var modelData; text: modelData === "none" ? "Neutral" : modelData; active: win.o.staticTheme === modelData
                                     onClicked: win.o.staticTheme = modelData } } } }
@@ -112,7 +112,10 @@ Variants {
                             TextField { width: 100; height: 30; text: win.o.customAccent; onAccepted: { if (/^#[0-9a-fA-F]{6}$/.test(text)) { win.o.customAccent = text; win.o.accentMode = "custom"; } } } } }
                     Section { text: "Style" }
                     SettingRow { title: "Corner radius"; desc: win.o.radius + " px"; Sl { value: win.o.radius; max: 28; onMoved: v => win.o.radius = Math.round(v) } }
-                    SettingRow { title: "Panel opacity"; desc: Math.round(win.o.panelOpacity * 100) + "% (lower shows Hyprland blur)"; Sl { value: win.o.panelOpacity - 0.4; max: 0.6; onMoved: v => win.o.panelOpacity = Math.round((v + 0.4) * 100) / 100 } }
+                    SettingRow { title: "Panel opacity"; desc: Math.round(win.o.panelOpacity * 100) + "% (popups & overlays)"; Sl { value: win.o.panelOpacity - 0.1; max: 0.9; onMoved: v => win.o.panelOpacity = Math.round((v + 0.1) * 100) / 100 } }
+                    SettingRow { title: "Top bar opacity"; desc: Math.round(win.o.barOpacity * 100) + "%"; Sl { value: win.o.barOpacity - 0.1; max: 0.9; onMoved: v => win.o.barOpacity = Math.round((v + 0.1) * 100) / 100 } }
+                    SettingRow { title: "Dock opacity"; desc: Math.round(win.o.dockOpacity * 100) + "%"; Sl { value: win.o.dockOpacity - 0.1; max: 0.9; onMoved: v => win.o.dockOpacity = Math.round((v + 0.1) * 100) / 100 } }
+                    SettingRow { title: "Desktop widgets opacity"; desc: Math.round(win.o.widgetsOpacity * 100) + "%"; Sl { value: win.o.widgetsOpacity - 0.1; max: 0.9; onMoved: v => win.o.widgetsOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Animation speed"; desc: win.o.animSpeed <= 0.01 ? "Off" : win.o.animSpeed.toFixed(1) + "×"; Sl { value: win.o.animSpeed; max: 2; onMoved: v => win.o.animSpeed = Math.round(v * 10) / 10 } }
                     SettingRow { title: "Font family"; TextField { width: 200; text: win.o.fontFamily; onAccepted: win.o.fontFamily = text } }
                     SettingRow { title: "Font size"; desc: Math.round(win.o.fontScale * 100) + "%"; Sl { value: win.o.fontScale - 0.8; max: 0.6; onMoved: v => win.o.fontScale = Math.round((v + 0.8) * 20) / 20 } }
@@ -178,7 +181,10 @@ Variants {
                     SettingRow { title: "Position"; Segmented { options: ["top", "bottom"]; current: win.o.barPosition; onPicked: v => win.o.barPosition = v } }
                     SettingRow { title: "Floating"; desc: "Detached rounded bar with margins."; Sw { checked: win.o.barFloating; onToggled: v => win.o.barFloating = v } }
                     SettingRow { title: "Auto-hide"; desc: "Slide away until the pointer touches the screen edge."; Sw { checked: win.o.barAutoHide; onToggled: v => win.o.barAutoHide = v } }
+                    SettingRow { title: "Keep visible on empty workspace"; desc: "Do not auto-hide when there are no windows on the current workspace."; Sw { checked: win.o.barKeepOnEmpty; onToggled: v => win.o.barKeepOnEmpty = v } }
+                    SettingRow { title: "Opacity"; desc: Math.round(win.o.barOpacity * 100) + "%"; Sl { value: win.o.barOpacity - 0.1; max: 0.9; onMoved: v => win.o.barOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Height"; desc: win.o.barHeight + " px"; Sl { value: win.o.barHeight - 28; max: 24; onMoved: v => win.o.barHeight = Math.round(v) + 28 } }
+                    SettingRow { title: "Scroll volume step"; desc: win.o.barScrollStep + "% when scrolling on empty bar space"; Sl { value: win.o.barScrollStep - 1; max: 19; onMoved: v => win.o.barScrollStep = Math.max(1, Math.round(v + 1)) } }
                     SettingRow { title: "Monitors"; desc: "Show a bar on every monitor or only the first."; Segmented { options: [{ label: "All", value: "all" }, { label: "Primary", value: "primary" }]; current: win.o.barMonitors; onPicked: v => win.o.barMonitors = v } }
                     Section { text: "Modules" }
                     SettingRow { title: "Window title"; Sw { checked: win.o.barShowTitle; onToggled: v => win.o.barShowTitle = v } }
@@ -196,6 +202,8 @@ Variants {
                     SettingRow { title: "Enable dock"; Sw { checked: win.o.dockEnabled; onToggled: v => win.o.dockEnabled = v } }
                     SettingRow { title: "Floating"; desc: "Off = attached to the screen edge across the full width."; Sw { checked: win.o.dockFloating; onToggled: v => win.o.dockFloating = v } }
                     SettingRow { title: "Auto-hide"; Sw { checked: win.o.dockAutoHide; onToggled: v => win.o.dockAutoHide = v } }
+                    SettingRow { title: "Keep visible on empty workspace"; desc: "Do not auto-hide when there are no windows on the current workspace."; Sw { checked: win.o.dockKeepOnEmpty; onToggled: v => win.o.dockKeepOnEmpty = v } }
+                    SettingRow { title: "Opacity"; desc: Math.round(win.o.dockOpacity * 100) + "%"; Sl { value: win.o.dockOpacity - 0.1; max: 0.9; onMoved: v => win.o.dockOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Icon size"; desc: win.o.dockIconSize + " px"; Sl { value: win.o.dockIconSize - 28; max: 44; onMoved: v => win.o.dockIconSize = Math.round(v) + 28 } }
                     Section { text: "Pinned apps" }
                     Repeater {
@@ -218,8 +226,9 @@ Variants {
                     key: "widgets"
                     Section { text: "Desktop widgets" }
                     SettingRow { title: "Enable widgets"; Sw { checked: win.o.widgetsEnabled; onToggled: v => win.o.widgetsEnabled = v } }
-                    SettingRow { title: "Position"; Row { spacing: 6
-                        Repeater { model: ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+                    SettingRow { title: "Opacity"; desc: Math.round(win.o.widgetsOpacity * 100) + "%"; Sl { value: win.o.widgetsOpacity - 0.1; max: 0.9; onMoved: v => win.o.widgetsOpacity = Math.round((v + 0.1) * 100) / 100 } }
+                    SettingRow { title: "Position"; Grid { columns: 3; spacing: 6
+                        Repeater { model: ["top-left", "top-center", "top-right", "left-center", "center", "right-center", "bottom-left", "bottom-center", "bottom-right"]
                             delegate: Chip { required property var modelData; text: modelData; active: win.o.widgetsPosition === modelData; onClicked: win.o.widgetsPosition = modelData } } } }
                     SettingRow { title: "Clock"; Sw { checked: win.o.widgetClock; onToggled: v => win.o.widgetClock = v } }
                     SettingRow { title: "Weather"; Sw { checked: win.o.widgetWeather; onToggled: v => win.o.widgetWeather = v } }

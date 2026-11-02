@@ -21,10 +21,18 @@ Variants {
         readonly property bool atTop: Config.o.barPosition !== "bottom"
         readonly property int gap: Config.o.barFloating ? 6 : 0
         readonly property bool autoHide: Config.o.barAutoHide
+        readonly property int activeWsId: Hyprland.monitorFor(win.screen)?.activeWorkspace?.id ?? 1
+        readonly property bool wsEmpty: ToplevelManager.toplevels.values.length === 0
+            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId)
         property bool pointerInside: false
         property bool kbMenuOpen: false
-        readonly property int popupSpace: kbMenuOpen ? 160 : 0
-        readonly property bool hidden: autoHide && !pointerInside && !kbMenuOpen && !Panels.active
+        property bool calendarOpen: false
+        property bool mediaPopupOpen: false
+        property int openTrayMenus: 0
+        readonly property bool trayMenuOpen: openTrayMenus > 0
+        readonly property bool anyPopupOpen: kbMenuOpen || calendarOpen || mediaPopupOpen || trayMenuOpen
+        readonly property int popupSpace: calendarOpen ? 324 : (kbMenuOpen ? 190 : (mediaPopupOpen ? 136 : 0))
+        readonly property bool hidden: autoHide && !(Config.o.barKeepOnEmpty && wsEmpty) && !pointerInside && !anyPopupOpen && !Panels.active
         anchors { left: true; right: true; top: atTop; bottom: !atTop }
         implicitHeight: Config.o.barHeight + gap * 2 + popupSpace
         exclusiveZone: autoHide ? 0 : Config.o.barHeight + gap * 2
@@ -34,14 +42,77 @@ Variants {
         color: "transparent"
         mask: Region { item: win.hidden ? trigger : maskArea }
 
+        property int calYear: new Date().getFullYear()
+        property int calMonth: new Date().getMonth()
+
+        function calendarDays(year, month) {
+            const first = new Date(year, month, 1);
+            // Monday = 0 .. Sunday = 6
+            const startDow = (first.getDay() + 6) % 7;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrev = new Date(year, month, 0).getDate();
+            const today = clock.date;
+            const tY = today.getFullYear(), tM = today.getMonth(), tD = today.getDate();
+            const cells = [];
+            for (let i = 0; i < 42; i++) {
+                const offset = i - startDow + 1;
+                let d, m = month, y = year, inMonth = true;
+                if (offset < 1) {
+                    d = daysInPrev + offset;
+                    m = month - 1;
+                    if (m < 0) { m = 11; y--; }
+                    inMonth = false;
+                } else if (offset > daysInMonth) {
+                    d = offset - daysInMonth;
+                    m = month + 1;
+                    if (m > 11) { m = 0; y++; }
+                    inMonth = false;
+                } else {
+                    d = offset;
+                }
+                cells.push({
+                    day: d,
+                    inMonth: inMonth,
+                    isToday: y === tY && m === tM && d === tD
+                });
+            }
+            return cells;
+        }
+
+        function prevMonth() {
+            if (calMonth === 0) { calMonth = 11; calYear--; }
+            else calMonth--;
+        }
+        function nextMonth() {
+            if (calMonth === 11) { calMonth = 0; calYear++; }
+            else calMonth++;
+        }
+
         SystemClock { id: clock; precision: Config.o.barSeconds ? SystemClock.Seconds : SystemClock.Minutes }
-        Timer { id: hideDelay; interval: 450; onTriggered: { win.pointerInside = false; win.kbMenuOpen = false; } }
+        Timer {
+            id: hideDelay
+            interval: 450
+            onTriggered: {
+                if (!win.trayMenuOpen) {
+                    win.pointerInside = false;
+                    win.kbMenuOpen = false;
+                    win.calendarOpen = false;
+                    win.mediaPopupOpen = false;
+                }
+            }
+        }
         HoverHandler {
             onHoveredChanged: { if (hovered) { hideDelay.stop(); win.pointerInside = true; } else hideDelay.restart(); }
         }
         Connections {
             target: Panels
-            function onActiveChanged() { if (Panels.active !== "") win.kbMenuOpen = false; }
+            function onActiveChanged() {
+                if (Panels.active !== "") {
+                    win.kbMenuOpen = false;
+                    win.calendarOpen = false;
+                    win.mediaPopupOpen = false;
+                }
+            }
         }
         Item {
             id: trigger
@@ -52,9 +123,21 @@ Variants {
         Item {
             id: maskArea
             x: bar.x
-            y: win.atTop ? bar.y : (win.kbMenuOpen ? kbMenu.y : bar.y)
+            y: win.atTop ? bar.y : 0
             width: bar.width
-            height: bar.height + (win.kbMenuOpen ? kbMenu.height + 12 : 0)
+            height: win.popupSpace > 0 ? win.height : bar.height
+        }
+
+        // Click outside popups in popupSpace closes popups
+        MouseArea {
+            anchors.fill: parent
+            enabled: win.kbMenuOpen || win.calendarOpen || win.mediaPopupOpen
+            visible: enabled
+            onClicked: {
+                win.kbMenuOpen = false;
+                win.calendarOpen = false;
+                win.mediaPopupOpen = false;
+            }
         }
 
         Component.onCompleted: if (modelData === Quickshell.screens[0]) Panels.registry["bar"] = { holder: bar }
@@ -67,59 +150,135 @@ Variants {
             opacity: win.hidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.anim } }
             radius: Config.o.barFloating ? Theme.radius : 0
-            color: Theme.panel
+            color: Theme.barPanel
             border.width: Config.o.barFloating ? 1 : 0
             border.color: Theme.border
 
+            // Scroll on empty bar space changes volume
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                onClicked: {
+                    win.kbMenuOpen = false;
+                    win.calendarOpen = false;
+                    win.mediaPopupOpen = false;
+                }
+                onWheel: w => {
+                    const step = (Config.o.barScrollStep || 5) / 100;
+                    Audio.step(w.angleDelta.y > 0 ? step : -step);
+                }
+            }
+
             // ---------- left ----------
             RowLayout {
+                id: leftRow
                 anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
                 spacing: 6
                 IconButton { glyph: "\uf00a"; size: 30; iconSize: 14; onClicked: Panels.toggle("launcher") }
-                Workspaces { screenObj: win.screen }
                 Label {
                     visible: Config.o.barShowTitle
-                    Layout.maximumWidth: 280
-                    Layout.leftMargin: 6
+                    Layout.maximumWidth: 260
+                    Layout.leftMargin: 4
                     text: ToplevelManager.activeToplevel?.title ?? ""
                     color: Theme.subtext
                     font.pixelSize: Theme.fsS + 1
                 }
             }
 
-            // ---------- center ----------
+            // ---------- center (media at left of clock, clock, workspaces at right of clock) ----------
             Row {
+                id: centerRow
                 anchors.centerIn: parent
-                spacing: 12
+                spacing: 10
+
+                // Media player pill (left of clock)
                 Rectangle {
+                    id: mediaPill
+                    visible: Config.o.barShowMedia && Media.player !== null
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: 28
+                    width: visible ? mediaRow.implicitWidth + 20 : 0
+                    radius: Theme.radiusS + 2
+                    color: win.mediaPopupOpen ? Theme.accent : (mediaMa.containsMouse ? Theme.hover : "transparent")
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                    Row {
+                        id: mediaRow
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Icon {
+                            text: Media.playing ? "\uf001" : "\uf04c"
+                            tint: win.mediaPopupOpen ? Theme.onAccent : Theme.accent
+                            font.pixelSize: 12
+                        }
+                        Label {
+                            width: Math.min(implicitWidth, 190)
+                            text: Media.player ? (Media.artist ? Media.artist + " — " : "") + (Media.title || Media.player.identity || "Media") : ""
+                            color: win.mediaPopupOpen ? Theme.onAccent : Theme.subtext
+                            font.pixelSize: Theme.fsS + 1
+                        }
+                    }
+                    MouseArea {
+                        id: mediaMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: m => {
+                            if (m.button === Qt.RightButton) {
+                                Media.playPause();
+                            } else {
+                                win.kbMenuOpen = false;
+                                win.calendarOpen = false;
+                                win.mediaPopupOpen = !win.mediaPopupOpen;
+                            }
+                        }
+                    }
+                }
+
+                // Clock & Date pill (center)
+                Rectangle {
+                    id: clockPill
+                    anchors.verticalCenter: parent.verticalCenter
                     height: 28; width: clockRow.implicitWidth + 24; radius: Theme.radiusS + 2
-                    color: clockMa.containsMouse ? Theme.hover : "transparent"
+                    color: win.calendarOpen ? Theme.accent : (clockMa.containsMouse ? Theme.hover : "transparent")
                     Behavior on color { ColorAnimation { duration: Theme.animFast } }
                     Row {
                         id: clockRow
                         anchors.centerIn: parent
                         spacing: 8
-                        Label { text: Qt.formatDateTime(clock.date, "ddd d MMM"); color: Theme.subtext }
+                        Label {
+                            text: Qt.formatDateTime(clock.date, "ddd d MMM")
+                            color: win.calendarOpen ? Theme.onAccent : Theme.subtext
+                        }
                         Label {
                             text: Qt.formatDateTime(clock.date, (Config.o.barClock24h ? "HH:mm" : "h:mm ap") + (Config.o.barSeconds ? ":ss" : ""))
                             font.weight: Font.DemiBold
+                            color: win.calendarOpen ? Theme.onAccent : Theme.text
                         }
                     }
-                    MouseArea { id: clockMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Panels.toggle("notifications") }
-                }
-                Row {
-                    visible: Config.o.barShowMedia && player !== null
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 6
-                    readonly property var player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
-                    Icon { text: parent.player && parent.player.isPlaying ? "\uf001" : "\uf04c"; tint: Theme.accent; font.pixelSize: 12 }
-                    Label {
-                        width: Math.min(implicitWidth, 220)
-                        text: parent.player ? (parent.player.trackArtist ? parent.player.trackArtist + " — " : "") + parent.player.trackTitle : ""
-                        color: Theme.subtext
-                        font.pixelSize: Theme.fsS + 1
+                    MouseArea {
+                        id: clockMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            win.kbMenuOpen = false;
+                            win.mediaPopupOpen = false;
+                            if (!win.calendarOpen) {
+                                win.calYear = clock.date.getFullYear();
+                                win.calMonth = clock.date.getMonth();
+                            }
+                            win.calendarOpen = !win.calendarOpen;
+                        }
                     }
-                    TapHandler { onTapped: { const p = parent.player; if (p) p.togglePlaying(); } }
+                }
+
+                // Workspaces (right of clock)
+                Workspaces {
+                    id: wsBar
+                    anchors.verticalCenter: parent.verticalCenter
+                    screenObj: win.screen
                 }
             }
 
@@ -142,6 +301,22 @@ Variants {
                             anchor.item: trayItem
                             anchor.edges: win.atTop ? Edges.Bottom : Edges.Top
                             anchor.gravity: win.atTop ? Edges.Bottom : Edges.Top
+                            property bool trackedOpen: false
+                            onVisibleChanged: {
+                                if (visible && !trackedOpen) { trackedOpen = true; win.openTrayMenus++; }
+                                else if (!visible && trackedOpen) {
+                                    trackedOpen = false;
+                                    win.openTrayMenus = Math.max(0, win.openTrayMenus - 1);
+                                    if (!win.pointerInside) hideDelay.restart();
+                                }
+                            }
+                            onOpened: if (!trackedOpen) { trackedOpen = true; win.openTrayMenus++; }
+                            onClosed: if (trackedOpen) {
+                                trackedOpen = false;
+                                win.openTrayMenus = Math.max(0, win.openTrayMenus - 1);
+                                if (!win.pointerInside) hideDelay.restart();
+                            }
+                            Component.onDestruction: if (trackedOpen) win.openTrayMenus = Math.max(0, win.openTrayMenus - 1)
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -186,7 +361,12 @@ Variants {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: m => {
                             if (m.button === Qt.RightButton) Keyboard.nextLayout();
-                            else { Keyboard.refresh(); win.kbMenuOpen = !win.kbMenuOpen; }
+                            else {
+                                Keyboard.refresh();
+                                win.calendarOpen = false;
+                                win.mediaPopupOpen = false;
+                                win.kbMenuOpen = !win.kbMenuOpen;
+                            }
                         }
                     }
                 }
@@ -216,16 +396,201 @@ Variants {
                     MouseArea { id: ccMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Panels.toggle("controlcenter") }
                 }
 
-                Item {
+                // Notification button: left click opens Notification Center, right click toggles Do Not Disturb
+                Rectangle {
                     Layout.preferredWidth: 30; Layout.preferredHeight: 30
-                    IconButton { anchors.fill: parent; glyph: Notifs.dnd ? "\uf1f6" : "\uf0f3"; size: 30; iconSize: 14; onClicked: Panels.toggle("notifications") }
+                    radius: 15
+                    color: Panels.active === "notifications" ? Theme.accent : (notifMa.containsMouse ? Theme.hover : "transparent")
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Icon {
+                        anchors.centerIn: parent
+                        text: Notifs.dnd ? "\uf1f6" : "\uf0f3"
+                        font.pixelSize: 14
+                        tint: Panels.active === "notifications" ? Theme.onAccent : (Notifs.dnd ? Theme.warn : Theme.text)
+                    }
                     Rectangle {
                         visible: Notifs.count > 0
                         x: 17; y: 3; width: 9; height: 9; radius: 5; color: Theme.accent
-                        border.width: 2; border.color: Theme.panel
+                        border.width: 2; border.color: Theme.barPanel
+                    }
+                    MouseArea {
+                        id: notifMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: m => {
+                            if (m.button === Qt.RightButton) {
+                                const next = !Notifs.dnd;
+                                Notifs.setDnd(next);
+                                Osd.show("dnd", next ? "\uf1f6" : "\uf0f3", "Do Not Disturb", -1, next ? "On" : "Off", next);
+                            } else {
+                                Panels.toggle("notifications");
+                            }
+                        }
                     }
                 }
                 IconButton { glyph: "\uf011"; size: 30; iconSize: 14; onClicked: Panels.toggle("session") }
+            }
+        }
+
+        // Expanded Media Player popup
+        Rectangle {
+            id: mediaPopup
+            visible: opacity > 0.01 && Media.player !== null
+            opacity: win.mediaPopupOpen && Media.player !== null ? 1 : 0
+            scale: win.mediaPopupOpen ? 1 : 0.94
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+            Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            width: 320
+            height: 112
+            x: Math.min(win.width - width - 10, Math.max(10, bar.x + centerRow.x + mediaPill.x + mediaPill.width / 2 - width / 2))
+            y: win.atTop ? (bar.y + bar.height + 6) : (bar.y - height - 6)
+            radius: Theme.radiusL
+            color: Theme.card
+            border.width: 1
+            border.color: Theme.border
+
+            MouseArea { anchors.fill: parent }
+
+            Rectangle {
+                id: mArt
+                x: 14; y: 14; width: 84; height: 84
+                radius: Theme.radius
+                color: Theme.surface3
+                clip: true
+                Image {
+                    anchors.fill: parent
+                    source: Media.art
+                    fillMode: Image.PreserveAspectCrop
+                    visible: status === Image.Ready
+                    sourceSize: Qt.size(168, 168)
+                }
+                Icon {
+                    anchors.centerIn: parent
+                    text: "\uf001"
+                    font.pixelSize: 26
+                    tint: Theme.subtext
+                    visible: !Media.art
+                }
+            }
+
+            Column {
+                anchors { left: mArt.right; leftMargin: 14; right: parent.right; rightMargin: 14; top: parent.top; topMargin: 14 }
+                spacing: 3
+                Label {
+                    width: parent.width
+                    text: Media.title || "Unknown track"
+                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.fsM
+                }
+                Label {
+                    width: parent.width
+                    text: Media.artist || (Media.player?.identity ?? "")
+                    color: Theme.subtext
+                    font.pixelSize: Theme.fsS + 1
+                }
+            }
+
+            Row {
+                anchors { left: mArt.right; leftMargin: 14; bottom: parent.bottom; bottomMargin: 12 }
+                spacing: 8
+                IconButton { glyph: "\uf048"; size: 32; iconSize: 12; onClicked: Media.previous() }
+                IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 32; iconSize: 12; active: true; onClicked: Media.playPause() }
+                IconButton { glyph: "\uf051"; size: 32; iconSize: 12; onClicked: Media.next() }
+            }
+        }
+
+        // Calendar popup
+        Rectangle {
+            id: calPopup
+            visible: opacity > 0.01
+            opacity: win.calendarOpen ? 1 : 0
+            scale: win.calendarOpen ? 1 : 0.94
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+            Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            width: 296
+            height: 306
+            x: Math.min(win.width - width - 10, Math.max(10, bar.x + centerRow.x + clockPill.x + clockPill.width / 2 - width / 2))
+            y: win.atTop ? (bar.y + bar.height + 6) : (bar.y - height - 6)
+            radius: Theme.radiusL
+            color: Theme.card
+            border.width: 1
+            border.color: Theme.border
+
+            MouseArea { anchors.fill: parent }
+
+            Item {
+                anchors { fill: parent; margins: 14 }
+
+                // Month / Year header
+                RowLayout {
+                    id: calHeader
+                    width: parent.width
+                    height: 32
+                    IconButton { glyph: "\uf053"; size: 28; iconSize: 11; onClicked: win.prevMonth() }
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: Qt.formatDate(new Date(win.calYear, win.calMonth, 1), "MMMM yyyy")
+                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.fsM
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                win.calYear = clock.date.getFullYear();
+                                win.calMonth = clock.date.getMonth();
+                            }
+                        }
+                    }
+                    IconButton { glyph: "\uf054"; size: 28; iconSize: 11; onClicked: win.nextMonth() }
+                }
+
+                // Weekday names
+                Row {
+                    id: dowRow
+                    y: 38
+                    width: parent.width
+                    Repeater {
+                        model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+                        delegate: Label {
+                            required property var modelData
+                            width: dowRow.width / 7
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData
+                            font.pixelSize: Theme.fsS
+                            font.weight: Font.DemiBold
+                            color: Theme.subtext
+                        }
+                    }
+                }
+
+                // 6x7 days grid
+                Grid {
+                    id: calGrid
+                    y: 62
+                    width: parent.width
+                    columns: 7
+                    Repeater {
+                        model: win.calendarDays(win.calYear, win.calMonth)
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: calGrid.width / 7
+                            height: 34
+                            radius: 17
+                            color: modelData.isToday ? Theme.accent : "transparent"
+                            Label {
+                                anchors.centerIn: parent
+                                text: modelData.day
+                                font.pixelSize: Theme.fsS + 1
+                                font.weight: modelData.isToday ? Font.Bold : Font.Normal
+                                color: modelData.isToday ? Theme.onAccent : (modelData.inMonth ? Theme.text : Theme.subtext)
+                                opacity: modelData.inMonth || modelData.isToday ? 1.0 : 0.4
+                            }
+                        }
+                    }
+                }
             }
         }
 

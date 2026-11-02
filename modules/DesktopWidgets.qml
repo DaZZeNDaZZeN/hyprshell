@@ -16,10 +16,17 @@ Variants {
         screen: modelData
         readonly property string pos: Config.o.widgetsPosition
         anchors {
-            top: pos.startsWith("top") || pos === "center"; bottom: pos.startsWith("bottom") || pos === "center"
-            left: pos.endsWith("left") || pos === "center"; right: pos.endsWith("right") || pos === "center"
+            top: pos.startsWith("top")
+            bottom: pos.startsWith("bottom")
+            left: pos.startsWith("left") || pos.endsWith("-left")
+            right: pos.startsWith("right") || pos.endsWith("-right")
         }
-        margins { top: 60; bottom: 90; left: 40; right: 40 }
+        margins {
+            top: anchors.top ? 60 : 0
+            bottom: anchors.bottom ? 90 : 0
+            left: anchors.left ? 40 : 0
+            right: anchors.right ? 40 : 0
+        }
         implicitWidth: col.implicitWidth + 4
         implicitHeight: col.implicitHeight + 4
         exclusionMode: ExclusionMode.Ignore
@@ -29,14 +36,14 @@ Variants {
 
         Component.onCompleted: { SysInfo.users++; Weather.users++; Panels.registry["widgets"] = { holder: col }; }
         Component.onDestruction: { SysInfo.users--; Weather.users--; }
-        SystemClock { id: clock; precision: SystemClock.Seconds }
-        readonly property bool alignRight: pos.endsWith("right")
+        SystemClock { id: clock; precision: SystemClock.Minutes }
+        readonly property bool alignRight: pos.startsWith("right") || pos.endsWith("-right")
 
         component Widget: Rectangle {
             default property alias body: inner.data
             implicitWidth: 300
             radius: Theme.radiusL
-            color: Theme.panel
+            color: Theme.widgetsPanel
             border.width: 1; border.color: Theme.border
             opacity: 0; scale: 0.96
             Component.onCompleted: { opacity = 1; scale = 1; }
