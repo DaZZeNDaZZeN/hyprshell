@@ -79,7 +79,7 @@ sudo pacman -S --needed \
 ### Step 1: Clone the repository
 
 ```bash
-git clone <repo-url> ~/hyprshell
+git clone https://github.com/DaZZeNDaZZeN/hyprshell ~/hyprshell
 cd ~/hyprshell
 ```
 
