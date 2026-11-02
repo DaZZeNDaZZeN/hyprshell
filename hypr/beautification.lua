@@ -178,6 +178,11 @@ hl.config({
 ---- WINDOWS AND WORKSPACES ----
 --------------------------------
 
+-- Persistent workspaces 1-10
+for i = 1, 10 do
+	hl.workspace_rule({ workspace = tostring(i), monitor = "", persistent = true })
+end
+
 -- See https://wiki.hypr.land/Configuring/Basics/Window-Rules/
 -- and https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
 
