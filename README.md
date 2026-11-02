@@ -79,49 +79,42 @@ sudo pacman -S --needed \
 ### Step 1: Clone the repository
 
 ```bash
-mkdir -p ~/Projects
-git clone <your-repo-url> ~/Projects/hyprshell
+git clone <repo-url> ~/hyprshell
+cd ~/hyprshell
 ```
 
-*(If you already have `/home/ren/Projects/hyprshell`, you can skip cloning.)*
+### Step 2: Copy `hyprshell` into Quickshell's configuration directory
 
-### Step 2: Link `hyprshell` into Quickshell's configuration directory
-
-Quickshell looks for shell configurations in `~/.config/quickshell/<name>`:
+Quickshell loads shell configurations from `~/.config/quickshell/<name>`:
 
 ```bash
-mkdir -p ~/.config/quickshell
-ln -sfn ~/Projects/hyprshell ~/.config/quickshell/hyprshell
+mkdir -p ~/.config/quickshell/hyprshell
+cp -r shell.qml config components services modules scripts pam ~/.config/quickshell/hyprshell/
+chmod +x ~/.config/quickshell/hyprshell/scripts/*.py ~/.config/quickshell/hyprshell/scripts/*.sh
 ```
 
-### Step 3: Install the Hyprland Lua configuration
+### Step 3: Copy the Hyprland Lua configuration
 
-Back up any existing `~/.config/hypr` directory, then copy the Hyprland Lua configuration files from `hypr/`:
+Back up any existing `~/.config/hypr` directory, then copy the Hyprland Lua configuration files into `~/.config/hypr/`:
 
 ```bash
-[ -d ~/.config/hypr ] && cp -r ~/.config/hypr ~/.config/hypr.backup
+[ -d ~/.config/hypr ] && mv ~/.config/hypr ~/.config/hypr.backup
 mkdir -p ~/.config/hypr
-cp ~/Projects/hyprshell/hypr/*.lua ~/.config/hypr/
+cp -r hypr/*.lua ~/.config/hypr/
 ```
 
-### Step 4: Prepare media & wallpaper directories
+### Step 4: Create media & wallpaper directories
 
 ```bash
 mkdir -p ~/Pictures/Wallpapers ~/Pictures/Screenshots ~/Videos/Recordings
 ```
 
-Place your wallpapers (`jpg`, `jpeg`, `png`, `webp`) inside `~/Pictures/Wallpapers` (or use the built-in **Wallhaven Browser** via `Super + Shift + W` to download wallpapers directly).
+Place your wallpapers (`jpg`, `jpeg`, `png`, `webp`) inside `~/Pictures/Wallpapers` (or press `Super + Shift + W` after starting the shell to browse and download wallpapers directly from **Wallhaven**).
 
-### Step 5: Ensure scripts are executable
+### Step 5: Start or Reload Hyprland
 
-```bash
-chmod +x ~/Projects/hyprshell/scripts/*.py ~/Projects/hyprshell/scripts/*.sh
-```
-
-### Step 6: Start or Reload Hyprland
-
-- **From a display manager or TTY**: Start a **Hyprland** session. [`autostart.lua`](./hypr/autostart.lua) will automatically launch `qs -c hyprshell`.
-- **Inside an existing Hyprland session**:
+- **From a display manager or TTY**: Log into a **Hyprland** session. [`autostart.lua`](./hypr/autostart.lua) will automatically start `qs -c hyprshell`.
+- **From an already running Hyprland session**:
   ```bash
   hyprctl reload
   pkill -x qs; setsid nohup qs -c hyprshell >/tmp/qs.log 2>&1 </dev/null &
