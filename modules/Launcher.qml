@@ -150,7 +150,13 @@ Variants {
                     }
                     MouseArea {
                         anchors.fill: parent; hoverEnabled: true
-                        onEntered: win.sel = row.index
+                        property real lastX: -1
+                        property real lastY: -1
+                        onPositionChanged: m => {
+                            if (lastX >= 0 && (Math.abs(m.x - lastX) > 1 || Math.abs(m.y - lastY) > 1)) win.sel = row.index;
+                            lastX = m.x; lastY = m.y;
+                        }
+                        onExited: { lastX = -1; lastY = -1; }
                         onClicked: { win.sel = row.index; win.activate(); }
                     }
                 }

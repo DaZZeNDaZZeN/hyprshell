@@ -9,6 +9,7 @@ import qs.config
 Singleton {
     id: root
     property var results: []
+    property ListModel model: ListModel {}
     property bool loading: false
     property string error: ""
     property int page: 1
@@ -43,7 +44,7 @@ Singleton {
         if (Config.o.wallhavenApiKey) u += "&apikey=" + encodeURIComponent(Config.o.wallhavenApiKey);
         return u;
     }
-    function search() { results = []; page = 1; lastPage = 1; fetch(1); }
+    function search() { results = []; model.clear(); page = 1; lastPage = 1; fetch(1); }
     function more() { if (!loading && page < lastPage) fetch(page + 1); }
     property var _xhr: null
     function fetch(p) {
@@ -58,7 +59,20 @@ Singleton {
             try {
                 const j = JSON.parse(xhr.responseText);
                 root.page = j.meta.current_page; root.lastPage = j.meta.last_page; root.total = j.meta.total;
-                root.results = (p === 1 ? [] : root.results).concat(j.data);
+                if (p === 1) { root.results = []; root.model.clear(); }
+                root.results = root.results.concat(j.data);
+                for (const it of j.data) {
+                    root.model.append({
+                        wid: it.id,
+                        path: it.path,
+                        thumbLarge: it.thumbs.large,
+                        thumbOrig: it.thumbs.original,
+                        resolution: it.resolution,
+                        favorites: it.favorites,
+                        fileSize: it.file_size,
+                        category: it.category
+                    });
+                }
             } catch (e) { error = "Bad response"; }
         };
         xhr.open("GET", url(p));

@@ -37,7 +37,7 @@ ShellRoot {
     IpcHandler {
         target: "shell"
         function toggle(name: string): void { Panels.toggle(name); }
-        function open(name: string): void { Panels.open(name); }
+        function open(name: string, page: string): void { Panels.open(name, page); }
         function close(): void { Panels.close(); }
         function grab(name: string): string { return Panels.grab(name, "/tmp/hs-" + name + ".png"); }
         function lock(): void { Actions.lock(); }

@@ -69,7 +69,10 @@ Variants {
                             color: Theme.text; font.family: "monospace"; font.pixelSize: Theme.fsM - 1
                         }
                         MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onEntered: win.sel = row.index; onClicked: win.pick(row.modelData) }
+                            property real lastX: -1; property real lastY: -1
+                            onPositionChanged: m => { if (lastX >= 0 && (Math.abs(m.x - lastX) > 1 || Math.abs(m.y - lastY) > 1)) win.sel = row.index; lastX = m.x; lastY = m.y; }
+                            onExited: { lastX = -1; lastY = -1; }
+                            onClicked: win.pick(row.modelData) }
                         Row {
                             id: acts
                             anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }

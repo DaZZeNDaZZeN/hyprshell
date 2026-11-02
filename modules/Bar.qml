@@ -22,25 +22,39 @@ Variants {
         readonly property int gap: Config.o.barFloating ? 6 : 0
         readonly property bool autoHide: Config.o.barAutoHide
         property bool pointerInside: false
-        readonly property bool hidden: autoHide && !pointerInside && !Panels.active
+        property bool kbMenuOpen: false
+        readonly property int popupSpace: kbMenuOpen ? 160 : 0
+        readonly property bool hidden: autoHide && !pointerInside && !kbMenuOpen && !Panels.active
         anchors { left: true; right: true; top: atTop; bottom: !atTop }
-        implicitHeight: Config.o.barHeight + gap * 2
-        exclusionMode: autoHide ? ExclusionMode.Ignore : ExclusionMode.Auto
+        implicitHeight: Config.o.barHeight + gap * 2 + popupSpace
+        exclusiveZone: autoHide ? 0 : Config.o.barHeight + gap * 2
+        exclusionMode: autoHide ? ExclusionMode.Ignore : ExclusionMode.Normal
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "hyprshell-bar"
         color: "transparent"
-        mask: Region { item: win.hidden ? trigger : bar }
+        mask: Region { item: win.hidden ? trigger : maskArea }
 
         SystemClock { id: clock; precision: Config.o.barSeconds ? SystemClock.Seconds : SystemClock.Minutes }
-        Timer { id: hideDelay; interval: 450; onTriggered: win.pointerInside = false }
+        Timer { id: hideDelay; interval: 450; onTriggered: { win.pointerInside = false; win.kbMenuOpen = false; } }
         HoverHandler {
             onHoveredChanged: { if (hovered) { hideDelay.stop(); win.pointerInside = true; } else hideDelay.restart(); }
+        }
+        Connections {
+            target: Panels
+            function onActiveChanged() { if (Panels.active !== "") win.kbMenuOpen = false; }
         }
         Item {
             id: trigger
             width: parent.width; height: 3
             anchors.top: win.atTop ? parent.top : undefined
             anchors.bottom: win.atTop ? undefined : parent.bottom
+        }
+        Item {
+            id: maskArea
+            x: bar.x
+            y: win.atTop ? bar.y : (win.kbMenuOpen ? kbMenu.y : bar.y)
+            width: bar.width
+            height: bar.height + (win.kbMenuOpen ? kbMenu.height + 12 : 0)
         }
 
         Component.onCompleted: if (modelData === Quickshell.screens[0]) Panels.registry["bar"] = { holder: bar }
@@ -111,6 +125,7 @@ Variants {
 
             // ---------- right ----------
             RowLayout {
+                id: rightRow
                 anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
                 spacing: 4
 
@@ -141,12 +156,39 @@ Variants {
                     }
                 }
 
-                Label {
+                // Keyboard layout dropdown button
+                Rectangle {
+                    id: kbBtn
                     visible: Config.o.barShowLayout && Keyboard.short !== ""
-                    text: Keyboard.short
-                    font.weight: Font.DemiBold
-                    color: Theme.subtext
-                    Layout.rightMargin: 4
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: kbRow.implicitWidth + 18
+                    radius: Theme.radiusS + 2
+                    color: win.kbMenuOpen ? Theme.accent : (kbMa.containsMouse ? Theme.hover : "transparent")
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Row {
+                        id: kbRow
+                        anchors.centerIn: parent
+                        spacing: 5
+                        Icon { text: "\uf11c"; font.pixelSize: 12; tint: win.kbMenuOpen ? Theme.onAccent : Theme.subtext }
+                        Label {
+                            text: Keyboard.short
+                            font.weight: Font.DemiBold
+                            font.pixelSize: Theme.fsS + 1
+                            color: win.kbMenuOpen ? Theme.onAccent : Theme.text
+                        }
+                        Icon { text: win.kbMenuOpen ? "\uf077" : "\uf078"; font.pixelSize: 9; tint: win.kbMenuOpen ? Theme.onAccent : Theme.subtext }
+                    }
+                    MouseArea {
+                        id: kbMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: m => {
+                            if (m.button === Qt.RightButton) Keyboard.nextLayout();
+                            else { Keyboard.refresh(); win.kbMenuOpen = !win.kbMenuOpen; }
+                        }
+                    }
                 }
 
                 // status cluster -> control center
@@ -186,6 +228,76 @@ Variants {
                 IconButton { glyph: "\uf011"; size: 30; iconSize: 14; onClicked: Panels.toggle("session") }
             }
         }
-    }
 
+        // Keyboard layout dropdown menu
+        Rectangle {
+            id: kbMenu
+            visible: opacity > 0.01
+            opacity: win.kbMenuOpen ? 1 : 0
+            scale: win.kbMenuOpen ? 1 : 0.94
+            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+            Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            width: 190
+            height: kbCol.implicitHeight + 12
+            x: Math.min(win.width - width - 10, Math.max(10, bar.x + rightRow.x + kbBtn.x - width / 2 + kbBtn.width / 2))
+            y: win.atTop ? (bar.y + bar.height + 6) : (bar.y - height - 6)
+            radius: Theme.radius
+            color: Theme.card
+            border.width: 1
+            border.color: Theme.border
+
+            Column {
+                id: kbCol
+                anchors { fill: parent; margins: 6 }
+                spacing: 2
+                Repeater {
+                    model: Keyboard.layouts
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool active: modelData.index === Keyboard.activeIndex
+                        width: kbCol.width
+                        height: 34
+                        radius: Theme.radiusS
+                        color: active ? Theme.accent : (kbm.containsMouse ? Theme.hover : "transparent")
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Row {
+                            x: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 10
+                            Label {
+                                text: modelData.code
+                                font.weight: Font.Bold
+                                font.pixelSize: Theme.fsS + 1
+                                color: active ? Theme.onAccent : Theme.accent
+                                width: 26
+                            }
+                            Label {
+                                text: modelData.name
+                                font.pixelSize: Theme.fsS + 1
+                                font.weight: active ? Font.DemiBold : Font.Normal
+                                color: active ? Theme.onAccent : Theme.text
+                            }
+                        }
+                        Icon {
+                            visible: active
+                            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+                            text: "\uf00c"
+                            font.pixelSize: 11
+                            tint: Theme.onAccent
+                        }
+                        MouseArea {
+                            id: kbm
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                Keyboard.setLayout(modelData.index);
+                                win.kbMenuOpen = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

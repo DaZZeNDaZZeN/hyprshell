@@ -9,7 +9,7 @@ Item {
     property string desc: ""
     default property alias control: slot.data
     Layout.fillWidth: true
-    implicitHeight: Math.max(52, textCol.implicitHeight + 20)
+    implicitHeight: Math.max(52, Math.max(textCol.implicitHeight, slot.implicitHeight) + 20)
     Column {
         id: textCol
         anchors { left: parent.left; right: slot.left; rightMargin: 16; verticalCenter: parent.verticalCenter }

@@ -92,7 +92,7 @@ Variants {
                         Segmented { options: [{ label: "Dark", value: "dark" }, { label: "Light", value: "light" }]; current: win.o.themeMode
                             onPicked: v => { win.o.themeMode = v; win.o.staticTheme = "none"; } } }
                     SettingRow { title: "Static theme"; desc: "Pick a fixed palette instead of the neutral base."
-                        Flow { width: 360; spacing: 6
+                        Row { spacing: 6
                             Repeater { model: Theme.staticNames
                                 delegate: Chip { required property var modelData; text: modelData === "none" ? "Neutral" : modelData; active: win.o.staticTheme === modelData
                                     onClicked: win.o.staticTheme = modelData } } } }
@@ -218,7 +218,7 @@ Variants {
                     key: "widgets"
                     Section { text: "Desktop widgets" }
                     SettingRow { title: "Enable widgets"; Sw { checked: win.o.widgetsEnabled; onToggled: v => win.o.widgetsEnabled = v } }
-                    SettingRow { title: "Position"; Flow { width: 360; spacing: 6
+                    SettingRow { title: "Position"; Row { spacing: 6
                         Repeater { model: ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
                             delegate: Chip { required property var modelData; text: modelData; active: win.o.widgetsPosition === modelData; onClicked: win.o.widgetsPosition = modelData } } } }
                     SettingRow { title: "Clock"; Sw { checked: win.o.widgetClock; onToggled: v => win.o.widgetClock = v } }
@@ -249,7 +249,7 @@ Variants {
                     Section { text: "Notifications" }
                     SettingRow { title: "Do not disturb"; desc: "Collect notifications silently in the history."; Sw { checked: win.o.dnd; onToggled: v => win.o.dnd = v } }
                     SettingRow { title: "Popup duration"; desc: (win.o.notifTimeout / 1000).toFixed(0) + " s"; Sl { value: win.o.notifTimeout - 1000; max: 14000; onMoved: v => win.o.notifTimeout = Math.round((v + 1000) / 500) * 500 } }
-                    SettingRow { title: "Position"; Flow { width: 300; spacing: 6
+                    SettingRow { title: "Position"; Row { spacing: 6
                         Repeater { model: ["top-right", "top-left", "bottom-right", "bottom-left"]
                             delegate: Chip { required property var modelData; text: modelData; active: win.o.notifPosition === modelData; onClicked: win.o.notifPosition = modelData } } } }
                     Section { text: "On-screen display" }

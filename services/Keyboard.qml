@@ -6,11 +6,34 @@ import Quickshell.Hyprland
 import QtQuick
 import qs.config
 
-// Keyboard layout (from Hyprland events) and lock-key LEDs (from sysfs).
+// Keyboard layout (from Hyprland events + hyprctl devices) and lock-key LEDs (from sysfs).
 Singleton {
     id: root
     property string layout: ""
+    property int activeIndex: 0
+    property var layouts: [] // [{ index: 0, code: "US", name: "English (US)" }, ...]
+
+    readonly property var codeNames: ({
+        "us": "English (US)",
+        "gb": "English (UK)",
+        "ru": "Russian",
+        "kz": "Kazakh",
+        "de": "German",
+        "fr": "French",
+        "es": "Spanish",
+        "it": "Italian",
+        "ua": "Ukrainian",
+        "pl": "Polish",
+        "tr": "Turkish",
+        "jp": "Japanese",
+        "kr": "Korean",
+        "cn": "Chinese"
+    })
+
     readonly property string short: {
+        if (layouts.length > activeIndex && layouts[activeIndex]) {
+            return layouts[activeIndex].code;
+        }
         const known = { "english": "EN", "russian": "RU", "kazakh": "KZ" };
         const l = layout.toLowerCase();
         for (const k in known) if (l.startsWith(k)) return known[k];
@@ -21,20 +44,52 @@ Singleton {
     property bool scroll: false
     property bool ready: false
 
-    Process {
-        running: true
-        command: ["sh", "-c", "hyprctl devices -j | jq -r '[.keyboards[] | select(.main)][0].active_keymap // empty'"]
-        stdout: StdioCollector { onStreamFinished: { root.layout = text.trim(); } }
+    function refresh() {
+        kbProc.running = true;
     }
+
+    function setLayout(idx) {
+        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(idx)]);
+    }
+
+    function nextLayout() {
+        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", "next"]);
+    }
+
+    Process {
+        id: kbProc
+        running: true
+        command: ["sh", "-c", "hyprctl devices -j | jq -c '[.keyboards[] | select(.main)][0] // .keyboards[0]'"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const kb = JSON.parse(text.trim());
+                    if (!kb) return;
+                    const codes = (kb.layout || "us").split(",").map(s => s.trim()).filter(Boolean);
+                    const idx = kb.active_layout_index ?? 0;
+                    const activeName = kb.active_keymap || "";
+                    root.activeIndex = idx;
+                    root.layout = activeName;
+                    root.layouts = codes.map((c, i) => ({
+                        index: i,
+                        code: c.toUpperCase(),
+                        name: i === idx && activeName ? activeName : (root.codeNames[c.toLowerCase()] || c.toUpperCase())
+                    }));
+                } catch (e) {}
+            }
+        }
+    }
+
     Connections {
         target: Hyprland
         function onRawEvent(ev) {
             if (ev.name !== "activelayout") return;
             const p = ev.data.split(",");
             const name = p.slice(1).join(",");
-            if (name === root.layout) return;
+            const changed = name !== root.layout;
             root.layout = name;
-            Osd.show("layout", "\uf11c", root.short, -1, name);
+            root.refresh();
+            if (changed) Osd.show("layout", "\uf11c", root.short, -1, name);
         }
     }
 

@@ -78,16 +78,16 @@ Variants {
                     clip: true
                     readonly property int cols: Math.max(2, Math.floor(width / 250))
                     cellWidth: Math.floor(width / cols); cellHeight: Math.round(cellWidth * 0.62)
-                    model: Wallhaven.results
+                    model: Wallhaven.model
                     boundsBehavior: Flickable.StopAtBounds
                     onAtYEndChanged: if (atYEnd && count > 0) Wallhaven.more()
                     delegate: Item {
                         id: cell
-                        required property var modelData
                         required property int index
+                        readonly property var itemData: Wallhaven.results[index] ?? ({ id: "", path: "", thumbs: { large: "", original: "" }, resolution: "", favorites: 0, file_size: 0, category: "" })
                         width: grid.cellWidth; height: grid.cellHeight
-                        readonly property bool have: Wallhaven.isDownloaded(modelData)
-                        readonly property bool busy: Wallhaven.downloading === modelData.id
+                        readonly property bool have: itemData.path ? Wallhaven.isDownloaded(itemData) : false
+                        readonly property bool busy: Wallhaven.downloading === itemData.id
                         Rectangle {
                             anchors { fill: parent; margins: 5 }
                             radius: Theme.radiusS + 2; color: Theme.surface2; clip: true
@@ -96,7 +96,7 @@ Variants {
                             Image {
                                 id: th
                                 anchors.fill: parent
-                                source: cell.modelData.thumbs.large
+                                source: cell.itemData.thumbs.large
                                 fillMode: Image.PreserveAspectCrop; asynchronous: true
                                 sourceSize: Qt.size(400, 260)
                                 opacity: status === Image.Ready ? 1 : 0
@@ -107,15 +107,15 @@ Variants {
                                 height: 34; color: "#99000000"
                                 opacity: gm.containsMouse || cell.have ? 1 : 0
                                 Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
-                                Label { x: 10; anchors.verticalCenter: parent.verticalCenter; text: cell.modelData.resolution; color: "white"; font.pixelSize: Theme.fsS }
+                                Label { x: 10; anchors.verticalCenter: parent.verticalCenter; text: cell.itemData.resolution; color: "white"; font.pixelSize: Theme.fsS }
                                 Row { anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter } spacing: 4
                                     Icon { visible: cell.have; text: "\uf00c"; tint: Theme.ok; font.pixelSize: 12 }
-                                    Label { text: "\uf005 " + cell.modelData.favorites; color: "white"; font.pixelSize: Theme.fsS; font.family: Theme.iconFont }
+                                    Label { text: "\uf005 " + cell.itemData.favorites; color: "white"; font.pixelSize: Theme.fsS; font.family: Theme.iconFont }
                                 }
                             }
                             Rectangle { anchors.fill: parent; color: "#aa000000"; visible: cell.busy
                                 Label { anchors.centerIn: parent; text: "Downloading…"; color: "white" } }
-                            MouseArea { id: gm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.preview = cell.modelData }
+                            MouseArea { id: gm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.preview = cell.itemData }
                         }
                     }
                     Label { anchors.centerIn: parent; visible: Wallhaven.loading && Wallhaven.results.length === 0; text: "Loading…"; color: Theme.subtext }
