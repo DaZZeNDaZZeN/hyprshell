@@ -10,6 +10,7 @@ hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_MENU_PREFIX", "arch-")
 hl.env("HYPRCURSOR_THEME", "Nordzy-hyprcursors") -- cursor theme must be located at ~/.local/share/icons/
+hl.env("LIBGL_ALWAYS_SOFTWARE", "1")
 hl.env("HYPRCURSOR_SIZE", "24")
 
 -----------------------
