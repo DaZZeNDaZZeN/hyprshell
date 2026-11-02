@@ -30,16 +30,42 @@ Singleton {
         root.page = page ?? "";
         active = name;
     }
-    function close() { active = ""; }
+    property bool instantClose: false
+    property var pendingWs: null
+
+    function close() { instantClose = false; active = ""; }
+    function closeImmediate() { instantClose = true; active = ""; instantClose = false; }
     function toggle(name, page) {
         if (active === name && screenName === focusedScreen()) close();
         else open(name, page);
     }
     function isOpen(name, screen) { return active === name && screenName === screen; }
 
-    function switchWorkspace(ws) {
+    function dispatchWs(ws) {
         const arg = typeof ws === "number" ? String(ws) : ("\"" + String(ws) + "\"");
         Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ workspace = " + arg + " })"]);
+    }
+
+    function switchWorkspace(ws) {
+        if (root.active !== "") {
+            root.pendingWs = ws;
+            root.closeImmediate();
+            wsSwitchTimer.restart();
+        } else {
+            root.dispatchWs(ws);
+        }
+    }
+
+    Timer {
+        id: wsSwitchTimer
+        interval: 60
+        onTriggered: {
+            if (root.pendingWs !== null) {
+                const target = root.pendingWs;
+                root.pendingWs = null;
+                root.dispatchWs(target);
+            }
+        }
     }
 
     function refreshHypr() {

@@ -26,7 +26,7 @@ PanelWindow {
 
     Component.onCompleted: { if (screen && screen.name === Quickshell.screens[0].name) Panels.registry[name] = win; }
     Timer { id: closing; interval: Theme.animSlow + 80 }
-    onOpenChanged: if (!open) closing.restart()
+    onOpenChanged: if (!open) { if (Panels.instantClose) closing.stop(); else closing.restart(); }
 
     Rectangle {
         anchors.fill: parent

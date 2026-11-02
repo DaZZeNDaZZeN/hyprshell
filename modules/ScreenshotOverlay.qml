@@ -33,32 +33,31 @@ Variants {
         readonly property real rh: Math.abs(ey - sy)
         property string outFile: ""
 
-        function stamp() {
-            const d = new Date(), p = n => ("0" + n).slice(-2);
-            return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
-        }
         function capture(region) {
             const dir = Config.home + "/Pictures/Screenshots";
-            outFile = Screenshot.mode === "debug" ? "/tmp/hs-debug.png" : dir + "/screenshot-" + stamp() + ".png";
-            view.grabToImage(res => {
-                const tmp = "/tmp/hyprshell-full.png";
-                res.saveToFile(tmp);
-                Screenshot.cancel();
-                const k = res.image.width / view.width;
-                let cmd = "mkdir -p '" + dir + "' && ";
-                if (region) cmd += "magick '" + tmp + "' -crop " + Math.round(rw * k) + "x" + Math.round(rh * k) + "+" + Math.round(rx * k) + "+" + Math.round(ry * k) + " +repage '" + outFile + "'";
-                else cmd += "cp '" + tmp + "' '" + outFile + "'";
-                if (Screenshot.mode === "debug") cmd += " && true"; else cmd += " && wl-copy --type image/png < '" + outFile + "' && notify-send -a Screenshot -i '" + outFile + "' 'Screenshot saved' '" + outFile + "'";
-                Quickshell.execDetached(["sh", "-c", cmd]);
-            });
+            const outFile = Screenshot.mode === "debug" ? "/tmp/hs-debug.png" : (dir + "/screenshot-" + Screenshot.stamp() + ".png");
+            const k = view.implicitWidth > 0 && view.width > 0 ? (view.implicitWidth / view.width) : 1;
+            const cw = Math.max(1, Math.round(win.rw * k));
+            const ch = Math.max(1, Math.round(win.rh * k));
+            const cx = Math.max(0, Math.round(win.rx * k));
+            const cy = Math.max(0, Math.round(win.ry * k));
+            Screenshot.cancel();
+            let cmd = "mkdir -p '" + dir + "' && ";
+            if (region) {
+                cmd += "magick '" + Screenshot.freezeFile + "' -crop " + cw + "x" + ch + "+" + cx + "+" + cy + " +repage '" + outFile + "'";
+            } else {
+                cmd += "cp '" + Screenshot.freezeFile + "' '" + outFile + "'";
+            }
+            if (Screenshot.mode !== "debug") {
+                cmd += " && wl-copy --type image/png < '" + outFile + "' && notify-send -a Screenshot -i '" + outFile + "' 'Screenshot saved' '" + outFile + "'";
+            }
+            Quickshell.execDetached(["sh", "-c", cmd]);
         }
 
         onVisibleChanged: {
             if (!visible) return;
             selecting = false; sx = sy = ex = ey = 0;
-            if (Screenshot.mode !== "region") grabDelay.restart();
         }
-        Timer { id: grabDelay; interval: 250; onTriggered: win.capture(false) }
 
         FocusScope {
             anchors.fill: parent
@@ -66,11 +65,13 @@ Variants {
             Keys.onEscapePressed: Screenshot.cancel()
             Keys.onReturnPressed: if (win.rw > 4) win.capture(true)
 
-            ScreencopyView {
+            Image {
                 id: view
                 anchors.fill: parent
-                captureSource: win.modelData
-                live: false
+                source: win.visible ? ("file://" + Screenshot.freezeFile + "?v=" + Screenshot.freezeId) : ""
+                cache: false
+                asynchronous: false
+                fillMode: Image.Stretch
             }
             // dim everything outside the selection
             Rectangle { x: 0; y: 0; width: parent.width; height: win.selecting ? win.ry : parent.height; color: "#99000000" }

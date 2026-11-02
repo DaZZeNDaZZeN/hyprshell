@@ -38,6 +38,7 @@ ShellRoot {
         function toggle(name: string): void { Panels.toggle(name); }
         function open(name: string, page: string): void { Panels.open(name, page); }
         function close(): void { Panels.close(); }
+        function switchWs(ws: int): void { Panels.switchWorkspace(ws); }
         function grab(name: string): string { return Panels.grab(name, "/tmp/hs-" + name + ".png"); }
         function lock(): void { Actions.lock(); }
         function screenshot(mode: string): void { Screenshot.start(mode); }

@@ -24,9 +24,7 @@ Variants {
         readonly property real monY: mon?.y ?? 0
 
         function go(i) {
-            const targetWs = i + 1;
-            Panels.close();
-            Panels.switchWorkspace(targetWs);
+            Panels.switchWorkspace(i + 1);
         }
 
         onOpenChanged: {

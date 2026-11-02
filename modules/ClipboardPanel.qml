@@ -17,9 +17,9 @@ Variants {
         property int sel: 0
         readonly property var shownEntries: {
             const q = search.text.trim().toLowerCase();
-            return Clipboard.entries.filter(e => !q || e.text.toLowerCase().includes(q));
+            return Clipboard.entries.filter(e => !q || (e.text && e.text.toLowerCase().includes(q)) || (e.image && e.image.toLowerCase().includes(q)));
         }
-        function pick(e) { Panels.close(); Clipboard.copy(e.text); }
+        function pick(e) { Panels.close(); Clipboard.copy(e); }
         onOpenChanged: if (open) { search.text = ""; sel = 0; search.forceActiveFocus(); }
 
         PopupCard {
@@ -56,15 +56,63 @@ Variants {
                         id: row
                         required property var modelData
                         required property int index
-                        width: list.width; height: Math.min(86, txt.implicitHeight + 24)
+                        readonly property bool isImage: row.modelData.type === "image" && !!row.modelData.image
+                        width: list.width
+                        height: isImage ? 116 : Math.min(86, Math.max(44, txt.implicitHeight + 24))
                         radius: Theme.radiusS + 2
                         color: win.sel === index ? Theme.accentDim : (rm.containsMouse ? Theme.surface2 : Theme.surface)
                         border.width: win.sel === index ? 1 : 0; border.color: Theme.accentSoft
                         Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                        // Image preview item
+                        Row {
+                            visible: row.isImage
+                            anchors { left: parent.left; leftMargin: 12; right: acts.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                            spacing: 12
+                            Rectangle {
+                                width: 148; height: 94
+                                radius: Theme.radiusS
+                                color: Theme.bg
+                                border.width: 1; border.color: Theme.border
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    anchors.margins: 2
+                                    source: row.isImage ? "file://" + row.modelData.image : ""
+                                    fillMode: Image.PreserveAspectFit
+                                    sourceSize: Qt.size(296, 188)
+                                    asynchronous: true
+                                }
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 4
+                                width: parent.width - 164
+                                Row {
+                                    spacing: 6
+                                    Icon { text: "\uf03e"; font.pixelSize: 12; tint: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+                                    Label {
+                                        text: row.modelData.text || "Copied image"
+                                        font.weight: Font.Medium
+                                        color: Theme.text
+                                    }
+                                }
+                                Label {
+                                    width: parent.width
+                                    text: row.modelData.image ? row.modelData.image.split("/").pop() : ""
+                                    font.pixelSize: Theme.fsS
+                                    color: Theme.subtext
+                                }
+                            }
+                        }
+
+                        // Text item
                         Text {
                             id: txt
+                            visible: !row.isImage
                             anchors { left: parent.left; leftMargin: 14; right: acts.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
-                            text: row.modelData.text.trim()
+                            text: (row.modelData.text || "").trim()
+                            textFormat: Text.PlainText
                             maximumLineCount: 3; elide: Text.ElideRight; wrapMode: Text.WrapAnywhere
                             color: Theme.text; font.family: "monospace"; font.pixelSize: Theme.fsM - 1
                         }

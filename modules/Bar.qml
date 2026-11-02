@@ -93,15 +93,18 @@ Variants {
             id: hideDelay
             interval: 450
             onTriggered: {
-                if (!win.trayMenuOpen) {
-                    win.pointerInside = false;
-                    win.kbMenuOpen = false;
-                    win.calendarOpen = false;
-                    win.mediaPopupOpen = false;
+                if (win.trayMenuOpen) {
+                    hideDelay.restart();
+                    return;
                 }
+                win.pointerInside = false;
+                win.kbMenuOpen = false;
+                win.calendarOpen = false;
+                win.mediaPopupOpen = false;
             }
         }
         HoverHandler {
+            id: barHover
             onHoveredChanged: { if (hovered) { hideDelay.stop(); win.pointerInside = true; } else hideDelay.restart(); }
         }
         Connections {
@@ -303,18 +306,29 @@ Variants {
                             anchor.gravity: win.atTop ? Edges.Bottom : Edges.Top
                             property bool trackedOpen: false
                             onVisibleChanged: {
-                                if (visible && !trackedOpen) { trackedOpen = true; win.openTrayMenus++; }
-                                else if (!visible && trackedOpen) {
+                                if (visible && !trackedOpen) {
+                                    trackedOpen = true;
+                                    win.openTrayMenus++;
+                                    hideDelay.stop();
+                                } else if (!visible && trackedOpen) {
                                     trackedOpen = false;
                                     win.openTrayMenus = Math.max(0, win.openTrayMenus - 1);
-                                    if (!win.pointerInside) hideDelay.restart();
+                                    hideDelay.restart();
                                 }
                             }
-                            onOpened: if (!trackedOpen) { trackedOpen = true; win.openTrayMenus++; }
-                            onClosed: if (trackedOpen) {
-                                trackedOpen = false;
-                                win.openTrayMenus = Math.max(0, win.openTrayMenus - 1);
-                                if (!win.pointerInside) hideDelay.restart();
+                            onOpened: {
+                                if (!trackedOpen) {
+                                    trackedOpen = true;
+                                    win.openTrayMenus++;
+                                }
+                                hideDelay.stop();
+                            }
+                            onClosed: {
+                                if (trackedOpen) {
+                                    trackedOpen = false;
+                                    win.openTrayMenus = Math.max(0, win.openTrayMenus - 1);
+                                }
+                                hideDelay.restart();
                             }
                             Component.onDestruction: if (trackedOpen) win.openTrayMenus = Math.max(0, win.openTrayMenus - 1)
                         }
