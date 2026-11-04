@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
@@ -6,7 +7,7 @@ import qs.config
 import qs.components
 import qs.services
 
-// Application launcher: apps, windows, calculator ("=" or maths), commands (">"), web search ("?"), shell actions.
+// Application launcher: apps, windows, calculator ("=" or maths via libqalculate), commands (">"), web search ("?"), shell actions.
 Variants {
     model: Quickshell.screens
 
@@ -17,6 +18,58 @@ Variants {
         name: "launcher"
         property var results: []
         property int sel: 0
+        property string calcExpr: ""
+        property string calcResult: ""
+        property string calcFull: ""
+        property string pendingCalcExpr: ""
+
+        function isCalcCandidate(q) {
+            if (q.startsWith("=")) return q.substring(1).trim().length > 0;
+            if (/^[0-9+\-*\/().,%^\s]+$/.test(q) && /[0-9]/.test(q) && /[+\-*\/%^]/.test(q)) return true;
+            if (/^(0x[0-9a-f]+|0b[01]+|[0-9]+([.,][0-9]+)?)\s+[a-z°%$€£¥]+.*\b(to|in)\b\s+[a-z0-9°%$€£¥]+/i.test(q)) return true;
+            if (/^(0x[0-9a-f]+|0b[01]+|[0-9]+).*\b(to|in)\s+(hex|bin|binary|oct|octal|dec|decimal|roman|base\b)/i.test(q)) return true;
+            if (/\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|log|ln|exp|abs|ceil|floor|round|fact|factorial|binom|gcd|lcm|solve|integrate|diff|der|sum|product)\s*\(/i.test(q)) return true;
+            return false;
+        }
+
+        Timer {
+            id: qalcTimer
+            interval: 80
+            onTriggered: {
+                if (!win.pendingCalcExpr) return;
+                if (qalcProc.running) qalcProc.running = false;
+                qalcProc.expr = win.pendingCalcExpr;
+                qalcProc.command = ["qalc", "-u8", "-m", "500", "-s", "decimal comma off", win.pendingCalcExpr];
+                qalcProc.running = true;
+            }
+        }
+
+        Process {
+            id: qalcProc
+            property string expr: ""
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    const lines = text.trim().split("\n").map(l => l.trim()).filter(Boolean);
+                    if (!lines.length) return;
+                    if (lines.some(l => /^error:/i.test(l) || /^warning:.*misplaced operator/i.test(l))) return;
+                    const eqLines = lines.filter(l => !/^warning:/i.test(l));
+                    if (!eqLines.length) return;
+                    const last = eqLines[eqLines.length - 1];
+                    const parts = last.split(/\s+(?:=|≈)\s+/);
+                    if (parts.length < 2) return;
+                    const rhs = parts[parts.length - 1].trim();
+                    if (!rhs) return;
+                    win.calcExpr = qalcProc.expr;
+                    win.calcResult = rhs;
+                    win.calcFull = last;
+                    const curQ = input.text.trim();
+                    const curExpr = (curQ.startsWith("=") ? curQ.substring(1) : curQ).trim();
+                    if (curExpr === qalcProc.expr) {
+                        win.results = win.compute(input.text);
+                    }
+                }
+            }
+        }
 
         function actions() {
             return [
@@ -64,15 +117,35 @@ Variants {
                 const c = q.substring(1).trim();
                 return [{ title: "Search the web for “" + c + "”", sub: Config.o.webSearchUrl, glyph: "\uf002", run: () => Quickshell.execDetached(["xdg-open", Config.o.webSearchUrl + encodeURIComponent(c)]) }];
             }
-            const expr = q.startsWith("=") ? q.substring(1) : q;
-            if (/^[0-9+\-*\/().,%^\s]+$/.test(expr) && /[0-9]/.test(expr) && /[+\-*\/%^]/.test(expr)) {
-                try {
-                    const v = Function("\"use strict\"; return (" + expr.replace(/\^/g, "**").replace(/,/g, ".") + ")")();
-                    if (typeof v === "number" && isFinite(v)) {
-                        const t = String(Math.round(v * 1e10) / 1e10);
-                        out.push({ title: t, sub: "Calculator — Enter to copy", glyph: "\uf1ec", score: 200, run: () => Clipboard.copy(t) });
+            const expr = (q.startsWith("=") ? q.substring(1) : q).trim();
+            if (isCalcCandidate(q) && expr !== "") {
+                if (calcExpr === expr && calcResult !== "") {
+                    const res = calcResult;
+                    out.push({
+                        title: res,
+                        sub: calcFull + "  ·  libqalculate — Enter to copy",
+                        glyph: "\uf1ec",
+                        score: 250,
+                        run: () => Clipboard.copy(res)
+                    });
+                } else {
+                    if (pendingCalcExpr !== expr) {
+                        pendingCalcExpr = expr;
+                        qalcTimer.restart();
                     }
-                } catch (e) {}
+                    if (/^[0-9+\-*\/().,%^\s]+$/.test(expr) && /[0-9]/.test(expr) && /[+\-*\/%^]/.test(expr)) {
+                        try {
+                            const v = Function("\"use strict\"; return (" + expr.replace(/\^/g, "**").replace(/,/g, ".") + ")")();
+                            if (typeof v === "number" && isFinite(v)) {
+                                const t = String(Math.round(v * 1e10) / 1e10);
+                                out.push({ title: t, sub: "Calculator — Enter to copy", glyph: "\uf1ec", score: 200, run: () => Clipboard.copy(t) });
+                            }
+                        } catch (e) {}
+                    }
+                }
+            } else {
+                pendingCalcExpr = "";
+                qalcTimer.stop();
             }
             const lq = q.toLowerCase();
             for (const a of apps) {
@@ -97,7 +170,7 @@ Variants {
             Panels.close();
             r.run();
         }
-        onOpenChanged: if (open) Qt.callLater(() => { input.text = ""; update(); input.forceActiveFocus(); })
+        onOpenChanged: if (open) Qt.callLater(() => { calcExpr = ""; calcResult = ""; calcFull = ""; pendingCalcExpr = ""; input.text = ""; update(); input.forceActiveFocus(); })
 
         PopupCard {
             id: card

@@ -55,7 +55,7 @@ sudo pacman -S --needed \
   pipewire wireplumber playerctl brightnessctl \
   networkmanager bluez bluez-utils upower \
   wl-clipboard grim slurp wf-recorder imagemagick \
-  jq curl python \
+  jq curl python libqalculate \
   breeze breeze-icons breeze-gtk kconfig \
   noto-fonts noto-fonts-cjk noto-fonts-emoji awesome-terminal-fonts \
   kitty firefox dolphin
