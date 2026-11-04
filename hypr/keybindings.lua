@@ -74,6 +74,7 @@ hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd(ipc .. "volume up"), { locked = 
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd(ipc .. "volume down"), { locked = true, repeating = true })
 hl.bind("XF86AudioMute", hl.dsp.exec_cmd(ipc .. "volume mute"), { locked = true, repeating = true })
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(ipc .. "mic"), { locked = true, repeating = true })
+hl.bind("mouse:275", hl.dsp.exec_cmd(ipc .. "mic"), { locked = true })
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd(ipc .. "brightness up"), { locked = true, repeating = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(ipc .. "brightness down"), { locked = true, repeating = true })
 

@@ -167,6 +167,7 @@ Configured in [`hypr/keybindings.lua`](./hypr/keybindings.lua):
 | `Super + L` | Lock Screen |
 | `Super + Shift + S` | Screenshot Region (saves + copies to clipboard) |
 | `Super + Shift + R` | Toggle Screen Recording |
+| `Mouse4` (`mouse:275`) | Toggle Microphone Mute |
 | `Super + T` / `Ctrl + Alt + T` | Open Terminal (`kitty`) |
 | `Super + E` | Open File Manager (`dolphin`) |
 | `Super + W` | Open Browser (`firefox`) |

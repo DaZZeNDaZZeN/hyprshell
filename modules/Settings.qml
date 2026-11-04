@@ -293,6 +293,7 @@ Variants {
                             ["Super + N", "Notifications"], ["Super + H", "Control center"], ["Super + Z", "Session panel"], ["Super + R", "Launcher"],
                             ["Alt + ` / Super + Tab", "Workspace switcher"], ["Super + Shift + S", "Screenshot"], ["Super + V", "Clipboard history"],
                             ["Super + I", "Settings"], ["Super + L", "Lock screen"], ["Super + Shift + W", "Wallpaper browser"], ["Super + Shift + R", "Toggle screen recording"],
+                            ["Mouse4", "Toggle microphone mute"],
                         ]
                         delegate: SettingRow { required property var modelData; title: modelData[1]
                             Rectangle { height: 28; width: kl.implicitWidth + 20; radius: 8; color: Theme.surface3

@@ -25,7 +25,10 @@ Singleton {
     function setVolume(v) { if (sink?.audio) { sink.audio.muted = false; sink.audio.volume = Math.max(0, Math.min(1.5, v)); } }
     function step(d) { setVolume(Math.round((volume + d) * 100) / 100); }
     function toggleMute() { if (sink?.audio) sink.audio.muted = !sink.audio.muted; }
-    function toggleMic() { if (source?.audio) source.audio.muted = !source.audio.muted; }
+    function toggleMic() {
+        if (source?.audio) source.audio.muted = !source.audio.muted;
+        else Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"]);
+    }
     function setMic(v) { if (source?.audio) source.audio.volume = Math.max(0, Math.min(1, v)); }
     function setDefault(n) { Pipewire.preferredDefaultAudioSink = n; }
     function setDefaultSource(n) { Pipewire.preferredDefaultAudioSource = n; }
