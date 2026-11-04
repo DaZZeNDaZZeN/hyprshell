@@ -41,17 +41,75 @@ Variants {
         color: "transparent"
         mask: Region { item: win.hidden ? trigger : maskItem }
 
-        // Apps shown in the dock: pinned first, then other running apps.
+        // Apps shown in the dock: ordered by their workspace and leftmost window position (non-running pinned apps follow).
         readonly property var entries: {
             const tops = ToplevelManager.toplevels.values;
+            const hyprTops = Hyprland.toplevels.values;
             const canon = id => (Apps.lookup(id)?.id ?? id).toLowerCase();
-            const list = Config.o.dockPinned.map(p => ({ id: p, key: canon(p), pinned: true, tops: [] }));
+            const list = Config.o.dockPinned.map((p, idx) => ({
+                id: p,
+                key: canon(p),
+                pinned: true,
+                pinIdx: idx,
+                tops: [],
+                minWs: Infinity,
+                minX: Infinity,
+                minY: Infinity
+            }));
+
+            function winPos(t) {
+                const ht = hyprTops.find(h => h && h.wayland === t);
+                const ipc = ht ? ht.lastIpcObject : null;
+                const rawWs = ht?.workspace?.id ?? ipc?.workspace?.id ?? 999999;
+                const ws = rawWs > 0 ? rawWs : (100000 - rawWs);
+                const x = (ipc && ipc.at && typeof ipc.at[0] === "number") ? ipc.at[0] : 999999;
+                const y = (ipc && ipc.at && typeof ipc.at[1] === "number") ? ipc.at[1] : 999999;
+                return { ws: ws, x: x, y: y };
+            }
+
+            let nextIdx = list.length;
             for (const t of tops) {
                 const k = canon(t.appId);
                 let e = list.find(x => x.key === k);
-                if (!e) { e = { id: t.appId, key: k, pinned: false, tops: [] }; list.push(e); }
+                if (!e) {
+                    e = {
+                        id: t.appId,
+                        key: k,
+                        pinned: false,
+                        pinIdx: nextIdx++,
+                        tops: [],
+                        minWs: Infinity,
+                        minX: Infinity,
+                        minY: Infinity
+                    };
+                    list.push(e);
+                }
                 e.tops.push(t);
             }
+
+            for (const e of list) {
+                if (e.tops.length > 0) {
+                    const withPos = e.tops.map(t => ({ t: t, pos: winPos(t) }));
+                    withPos.sort((a, b) => (a.pos.ws - b.pos.ws) || (a.pos.x - b.pos.x) || (a.pos.y - b.pos.y));
+                    e.tops = withPos.map(w => w.t);
+                    e.minWs = withPos[0].pos.ws;
+                    e.minX = withPos[0].pos.x;
+                    e.minY = withPos[0].pos.y;
+                }
+            }
+
+            list.sort((a, b) => {
+                const aRun = a.tops.length > 0;
+                const bRun = b.tops.length > 0;
+                if (aRun !== bRun) return aRun ? -1 : 1;
+                if (aRun) {
+                    if (a.minWs !== b.minWs) return a.minWs - b.minWs;
+                    if (a.minX !== b.minX) return a.minX - b.minX;
+                    if (a.minY !== b.minY) return a.minY - b.minY;
+                }
+                return a.pinIdx - b.pinIdx;
+            });
+
             return list;
         }
         function togglePin(e) {
@@ -65,7 +123,7 @@ Variants {
         Timer { id: previewHideDelay; interval: 200; onTriggered: if (!previewHover.hovered) win.hoverKey = "" }
         HoverHandler {
             onHoveredChanged: {
-                if (hovered) { hideDelay.stop(); win.pointerInside = true; }
+                if (hovered) { hideDelay.stop(); win.pointerInside = true; Panels.refreshHypr(); }
                 else { hideDelay.restart(); previewHideDelay.restart(); win.menuKey = ""; }
             }
         }

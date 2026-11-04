@@ -100,6 +100,7 @@ Singleton {
         function onRawEvent(ev) {
             const n = ev.name;
             if (n === "openwindow" || n === "closewindow" || n === "movewindow" || n === "movewindowv2"
+                || n === "activewindow" || n === "changefloatingmode" || n === "fullscreen"
                 || n === "workspace" || n === "workspacev2" || n === "createworkspace" || n === "createworkspacev2"
                 || n === "destroyworkspace" || n === "destroyworkspacev2" || n === "focusedmon") {
                 refreshTimer.restart();
