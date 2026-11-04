@@ -88,8 +88,13 @@ Variants {
             width: 396
             height: win.page === "main" ? mainCol.implicitHeight + 32 : 520
             Behavior on height { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
-            anchors { right: parent.right; rightMargin: 10; top: parent.top; topMargin: Config.o.barEnabled && Config.o.barPosition === "top" ? 54 : 10 }
-            slideY: -16
+            x: Panels.anchorX >= 0
+                ? Math.max(10, Math.min(parent.width - width - 10, Math.round(Panels.anchorX - width / 2)))
+                : parent.width - width - 10
+            y: Config.o.barEnabled && Config.o.barPosition === "bottom"
+                ? parent.height - height - (Config.o.barHeight + 16)
+                : (Config.o.barEnabled && Config.o.barPosition === "top" ? Config.o.barHeight + 16 : 10)
+            slideY: Config.o.barEnabled && Config.o.barPosition === "bottom" ? 16 : -16
             clip: true
 
             // ---------------- main ----------------
@@ -117,7 +122,8 @@ Variants {
                             on: Bt.on; onClicked: Bt.setOn(!Bt.on); onExpand: win.page = "bt" }
                         Tile { Layout.fillWidth: true; glyph: "\uf1f6"; label: "Do not disturb"; on: Notifs.dnd; sub: Notifs.dnd ? "On" : "Off"; onClicked: Notifs.setDnd(!Notifs.dnd) }
                         Tile { Layout.fillWidth: true; glyph: Theme.dark ? "\uf186" : "\uf185"; label: Theme.dark ? "Dark mode" : "Light mode"; on: Theme.dark
-                            onClicked: { Config.o.staticTheme = "none"; Config.o.themeMode = Theme.dark ? "light" : "dark"; } }
+                            sub: Theme.activeTheme === "none" ? "Neutral" : Theme.activeTheme
+                            onClicked: Config.o.themeMode = Theme.dark ? "light" : "dark" }
                         Tile { Layout.fillWidth: true; glyph: "\uf03d"; label: "Screen record"; on: Recorder.recording
                             sub: Recorder.recording ? "Recording…" : (Recorder.tool ? "Ready" : "Not installed"); onClicked: { Panels.close(); Recorder.toggle(); } }
                         Tile { Layout.fillWidth: true; glyph: "\uf028"; label: "Audio"; sub: Audio.sink ? (Audio.sink.description || Audio.sink.name) : ""; expandable: true
@@ -299,36 +305,72 @@ Variants {
                     PageHeader { title: "Audio" }
                     SliderRow { Layout.fillWidth: true; glyph: Audio.icon(Audio.volume, Audio.muted); value: Audio.volume; onMoved: v => Audio.setVolume(v); onIconClicked: Audio.toggleMute() }
                     SliderRow { Layout.fillWidth: true; glyph: Audio.micMuted ? "\uf131" : "\uf130"; value: Audio.micVolume; onMoved: v => Audio.setMic(v); onIconClicked: Audio.toggleMic() }
-                    Label { text: "Output device"; color: Theme.subtext; font.pixelSize: Theme.fsS }
-                    Repeater {
-                        model: Audio.sinks
-                        delegate: Rectangle {
-                            required property var modelData
-                            readonly property bool cur: Audio.sink === modelData
-                            Layout.fillWidth: true; height: 38; radius: Theme.radiusS + 2
-                            color: cur ? Theme.accentDim : (om.containsMouse ? Theme.surface2 : "transparent")
-                            Row { x: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
-                                Icon { text: cur ? "\uf00c" : "\uf028"; tint: cur ? Theme.accent : Theme.subtext; font.pixelSize: 13 }
-                                Label { text: modelData.description || modelData.name; width: 300 } }
-                            MouseArea { id: om; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Audio.setDefault(modelData) }
-                        }
-                    }
-                    Label { text: "Applications"; color: Theme.subtext; font.pixelSize: Theme.fsS }
-                    ListView {
-                        Layout.fillWidth: true; Layout.fillHeight: true
-                        clip: true; spacing: 4; model: Audio.streams
+                    Flickable {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        contentHeight: audioScrollCol.implicitHeight
+                        clip: true
                         boundsBehavior: Flickable.StopAtBounds
-                        delegate: Item {
-                            required property var modelData
-                            width: ListView.view.width; height: 56
-                            Label { x: 4; y: 2; text: Audio.nodeName(modelData); font.pixelSize: Theme.fsS + 1; width: 300 }
-                            RowLayout {
-                                x: 0; y: 22; width: parent.width; spacing: 8
-                                IconButton { glyph: modelData.audio.muted ? "\ueee8" : "\uf028"; size: 28; iconSize: 12; onClicked: modelData.audio.muted = !modelData.audio.muted }
-                                Slider { Layout.fillWidth: true; value: modelData.audio.volume; onMoved: v => modelData.audio.volume = v }
+                        ColumnLayout {
+                            id: audioScrollCol
+                            width: parent.width
+                            spacing: 6
+                            Label { text: "Output device"; color: Theme.subtext; font.pixelSize: Theme.fsS }
+                            Repeater {
+                                model: Audio.sinks
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool cur: Audio.sink === modelData
+                                    Layout.fillWidth: true; height: 38; radius: Theme.radiusS + 2
+                                    color: cur ? Theme.accentDim : (om.containsMouse ? Theme.surface2 : "transparent")
+                                    Row { x: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+                                        Icon { text: cur ? "\uf00c" : "\uf028"; tint: cur ? Theme.accent : Theme.subtext; font.pixelSize: 13 }
+                                        Label { text: modelData.description || modelData.name; width: 300 } }
+                                    MouseArea { id: om; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Audio.setDefault(modelData) }
+                                }
+                            }
+                            Label { Layout.topMargin: 4; text: "Input device"; color: Theme.subtext; font.pixelSize: Theme.fsS }
+                            Repeater {
+                                model: Audio.sources
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool cur: Audio.source === modelData
+                                    Layout.fillWidth: true; height: 38; radius: Theme.radiusS + 2
+                                    color: cur ? Theme.accentDim : (im.containsMouse ? Theme.surface2 : "transparent")
+                                    Row { x: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+                                        Icon { text: cur ? "\uf00c" : "\uf130"; tint: cur ? Theme.accent : Theme.subtext; font.pixelSize: 13 }
+                                        Label { text: modelData.description || modelData.name; width: 300 } }
+                                    MouseArea { id: im; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Audio.setDefaultSource(modelData) }
+                                }
+                            }
+                            Label {
+                                visible: Audio.sources.length === 0
+                                text: "No input devices found"
+                                color: Theme.subtext
+                                font.pixelSize: Theme.fsS
+                            }
+                            Label { Layout.topMargin: 4; text: "Applications"; color: Theme.subtext; font.pixelSize: Theme.fsS }
+                            Repeater {
+                                model: Audio.streams
+                                delegate: Item {
+                                    required property var modelData
+                                    Layout.fillWidth: true; height: 56
+                                    Label { x: 4; y: 2; text: Audio.nodeName(modelData); font.pixelSize: Theme.fsS + 1; width: 300 }
+                                    RowLayout {
+                                        x: 0; y: 22; width: parent.width; spacing: 8
+                                        IconButton { glyph: modelData.audio.muted ? "\ueee8" : "\uf028"; size: 28; iconSize: 12; onClicked: modelData.audio.muted = !modelData.audio.muted }
+                                        Slider { Layout.fillWidth: true; value: modelData.audio.volume; onMoved: v => modelData.audio.volume = v }
+                                    }
+                                }
+                            }
+                            Label {
+                                visible: Audio.streams.length === 0
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.topMargin: 8
+                                text: "No apps are playing audio"
+                                color: Theme.subtext
                             }
                         }
-                        Label { anchors.centerIn: parent; visible: Audio.streams.length === 0; text: "No apps are playing audio"; color: Theme.subtext }
                     }
                 }
             }

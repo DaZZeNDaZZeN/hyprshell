@@ -9,16 +9,27 @@ Singleton {
     id: root
 
     readonly property var statics: ({
-        "nord":     { dark: true,  bg: "#2e3440", surface: "#3b4252", surface2: "#434c5e", text: "#eceff4", sub: "#a7b0c0", accent: "#88c0d0" },
-        "gruvbox":  { dark: true,  bg: "#282828", surface: "#3c3836", surface2: "#504945", text: "#ebdbb2", sub: "#a89984", accent: "#d79921" },
-        "mocha":    { dark: true,  bg: "#1e1e2e", surface: "#313244", surface2: "#45475a", text: "#cdd6f4", sub: "#a6adc8", accent: "#cba6f7" },
-        "rosepine": { dark: true,  bg: "#191724", surface: "#26233a", surface2: "#312e48", text: "#e0def4", sub: "#908caa", accent: "#ebbcba" },
-        "latte":    { dark: false, bg: "#eff1f5", surface: "#e6e9ef", surface2: "#ccd0da", text: "#4c4f69", sub: "#6c6f85", accent: "#8839ef" }
+        // Dark palettes
+        "nord":           { dark: true,  bg: "#2e3440", surface: "#3b4252", surface2: "#434c5e", text: "#eceff4", sub: "#a7b0c0", accent: "#88c0d0" },
+        "gruvbox":        { dark: true,  bg: "#282828", surface: "#3c3836", surface2: "#504945", text: "#ebdbb2", sub: "#a89984", accent: "#d79921" },
+        "mocha":          { dark: true,  bg: "#1e1e2e", surface: "#313244", surface2: "#45475a", text: "#cdd6f4", sub: "#a6adc8", accent: "#cba6f7" },
+        "rosepine":       { dark: true,  bg: "#191724", surface: "#26233a", surface2: "#312e48", text: "#e0def4", sub: "#908caa", accent: "#ebbcba" },
+        "tokyonight":     { dark: true,  bg: "#1a1b26", surface: "#24283b", surface2: "#292e42", text: "#c0caf5", sub: "#787c99", accent: "#7aa2f7" },
+        "kanagawa":       { dark: true,  bg: "#1f1f28", surface: "#2a2a37", surface2: "#363646", text: "#dcd7ba", sub: "#938aa9", accent: "#7e9cd8" },
+        // Light palettes
+        "latte":          { dark: false, bg: "#eff1f5", surface: "#e6e9ef", surface2: "#ccd0da", text: "#4c4f69", sub: "#6c6f85", accent: "#8839ef" },
+        "dawn":           { dark: false, bg: "#faf4ed", surface: "#fffaf3", surface2: "#f2e9e1", text: "#575279", sub: "#797593", accent: "#d7827e" },
+        "gruvbox-light":  { dark: false, bg: "#fbf1c7", surface: "#f2e5bc", surface2: "#ebdbb2", text: "#3c3836", sub: "#665c54", accent: "#b57614" },
+        "nord-light":     { dark: false, bg: "#eceff4", surface: "#e5e9f0", surface2: "#d8dee9", text: "#2e3440", sub: "#4c566a", accent: "#5e81ac" },
+        "tokyonight-day": { dark: false, bg: "#e1e2e7", surface: "#d5d6db", surface2: "#c8c9ce", text: "#3760bf", sub: "#6172b0", accent: "#2e7de9" },
+        "lotus":          { dark: false, bg: "#f2ecbc", surface: "#e7dba0", surface2: "#d5cea3", text: "#545464", sub: "#716e61", accent: "#4d699b" }
     })
-    readonly property var staticNames: ["none", "nord", "gruvbox", "mocha", "rosepine", "latte"]
+    readonly property var darkThemes: ["none", "nord", "gruvbox", "mocha", "rosepine", "tokyonight", "kanagawa"]
+    readonly property var lightThemes: ["none", "latte", "dawn", "gruvbox-light", "nord-light", "tokyonight-day", "lotus"]
 
-    readonly property var st: statics[Config.o.staticTheme] ?? null
-    readonly property bool dark: st ? st.dark : Config.o.themeMode !== "light"
+    readonly property bool dark: Config.o.themeMode !== "light"
+    readonly property string activeTheme: dark ? Config.o.darkTheme : Config.o.lightTheme
+    readonly property var st: statics[activeTheme] ?? null
 
     // ---- user overrides (hot-reloaded JSON: any token below can be overridden) ----
     property var ov: ({})

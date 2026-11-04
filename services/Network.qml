@@ -25,7 +25,7 @@ Singleton {
         return "\uf1eb";
     }
 
-    function refresh() { devs.running = true; radio.running = true; if (wifiEnabled || wanted) scan(false); }
+    function refresh() { devs.running = true; radio.running = true; if (wanted && wifiEnabled) scan(false); }
     function scan(rescan) {
         if (scanning) return;
         scanning = true;
@@ -57,12 +57,14 @@ Singleton {
         command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "dev"]
         stdout: StdioCollector {
             onStreamFinished: {
-                let eth = false, name = "";
+                let eth = false, name = "", wifiSsid = "";
                 for (const l of text.trim().split("\n")) {
                     const p = l.split(":");
-                    if (p[1] === "ethernet" && p[2] === "connected") { eth = true; name = p[3]; }
+                    if (p[1] === "ethernet" && p[2] === "connected") { eth = true; name = p[3] || ""; }
+                    else if (p[1] === "wifi" && p[2] === "connected") { wifiSsid = p[3] || ""; }
                 }
                 root.ethernetUp = eth; root.ethernetName = name;
+                if (!root.wanted) root.activeSsid = wifiSsid;
             }
         }
     }

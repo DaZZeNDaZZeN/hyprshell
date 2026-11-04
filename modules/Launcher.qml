@@ -33,7 +33,7 @@ Variants {
                 { title: "Screenshot region", sub: "Utility", glyph: "\uf030", run: () => Screenshot.start("region") },
                 { title: "Screenshot screen", sub: "Utility", glyph: "\uf108", run: () => Screenshot.start("screen") },
                 { title: "Toggle screen recording", sub: "Utility", glyph: "\uf03d", run: () => Recorder.toggle() },
-                { title: "Toggle dark / light", sub: "Appearance", glyph: "\uf186", run: () => { Config.o.themeMode = Theme.dark ? "light" : "dark"; Config.o.staticTheme = "none"; } },
+                { title: "Toggle dark / light", sub: "Appearance", glyph: "\uf186", run: () => { Config.o.themeMode = Theme.dark ? "light" : "dark"; } },
                 { title: "Random wallpaper", sub: "Appearance", glyph: "\uf074", run: () => Wallpaper.random() },
             ];
         }

@@ -131,21 +131,69 @@ Singleton {
         }
     }
 
+    property string capsPath: ""
+    property string numPath: ""
+    property string scrollPath: ""
+    property bool capsInit: false
+    property bool numInit: false
+    property bool scrollInit: false
+
     Process {
-        id: leds
-        command: ["sh", "-c", "for k in capslock numlock scrolllock; do cat /sys/class/leds/*::$k/brightness 2>/dev/null | sort -rn | head -n1; done"]
+        id: ledFinder
+        running: true
+        command: ["sh", "-c", "for k in capslock numlock scrolllock; do p=$(ls /sys/class/leds/*::$k/brightness 2>/dev/null | head -n1); echo \"${p:-}\"; done"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const v = text.trim().split("\n").map(x => parseInt(x) > 0);
-                const c = !!v[0], n = !!v[1], s = !!v[2];
-                if (root.ready) {
-                    if (c !== root.caps) Osd.show("caps", "\uf15b", "Caps Lock", -1, c ? "On" : "Off", c);
-                    if (n !== root.num) Osd.show("num", "\uf292", "Num Lock", -1, n ? "On" : "Off", n);
-                    if (s !== root.scroll) Osd.show("scroll", "\uf0ab", "Scroll Lock", -1, s ? "On" : "Off", s);
-                }
-                root.caps = c; root.num = n; root.scroll = s; root.ready = true;
+                const lines = text.split("\n");
+                root.capsPath = (lines[0] || "").trim();
+                root.numPath = (lines[1] || "").trim();
+                root.scrollPath = (lines[2] || "").trim();
             }
         }
     }
-    Timer { interval: 300; repeat: true; running: true; triggeredOnStart: true; onTriggered: if (!leds.running) leds.running = true }
+
+    FileView {
+        id: capsFile
+        path: root.capsPath
+        printErrors: false
+        onLoaded: {
+            const c = parseInt(text().trim()) > 0;
+            if (root.capsInit && c !== root.caps) Osd.show("caps", "\uf15b", "Caps Lock", -1, c ? "On" : "Off", c);
+            root.caps = c;
+            root.capsInit = true;
+        }
+    }
+    FileView {
+        id: numFile
+        path: root.numPath
+        printErrors: false
+        onLoaded: {
+            const n = parseInt(text().trim()) > 0;
+            if (root.numInit && n !== root.num) Osd.show("num", "\uf292", "Num Lock", -1, n ? "On" : "Off", n);
+            root.num = n;
+            root.numInit = true;
+        }
+    }
+    FileView {
+        id: scrollFile
+        path: root.scrollPath
+        printErrors: false
+        onLoaded: {
+            const s = parseInt(text().trim()) > 0;
+            if (root.scrollInit && s !== root.scroll) Osd.show("scroll", "\uf0ab", "Scroll Lock", -1, s ? "On" : "Off", s);
+            root.scroll = s;
+            root.scrollInit = true;
+        }
+    }
+
+    Timer {
+        interval: 300
+        repeat: true
+        running: root.capsPath !== "" || root.numPath !== "" || root.scrollPath !== ""
+        onTriggered: {
+            if (root.capsPath) capsFile.reload();
+            if (root.numPath) numFile.reload();
+            if (root.scrollPath) scrollFile.reload();
+        }
+    }
 }

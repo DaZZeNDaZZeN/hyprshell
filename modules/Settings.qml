@@ -59,8 +59,15 @@ Variants {
 
             Rectangle {
                 id: side
-                width: 232; height: parent.height
+                x: 1; y: 1
+                width: 232; height: parent.height - 2
+                radius: Math.max(0, card.radius - 1)
                 color: Theme.surface
+                Rectangle {
+                    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+                    width: parent.radius
+                    color: parent.color
+                }
                 Label { x: 22; y: 22; text: "Settings"; font.pixelSize: Theme.fsXL - 4; font.weight: Font.Bold }
                 Column {
                     x: 12; y: 76; width: parent.width - 24; spacing: 4
@@ -88,14 +95,19 @@ Variants {
                 Page {
                     key: "appearance"
                     Section { text: "Theme" }
-                    SettingRow { title: "Mode"; desc: "Dark or light base. Neutral surfaces, accent only on highlights."
+                    SettingRow { title: "Mode"; desc: "Toggle between your selected dark and light themes."
                         Segmented { options: [{ label: "Dark", value: "dark" }, { label: "Light", value: "light" }]; current: win.o.themeMode
-                            onPicked: v => { win.o.themeMode = v; win.o.staticTheme = "none"; } } }
-                    SettingRow { title: "Static theme"; desc: "Pick a fixed palette instead of the neutral base."
+                            onPicked: v => win.o.themeMode = v } }
+                    SettingRow { title: "Dark theme"; desc: "Palette used when dark mode is active."
                         Flow { width: 410; spacing: 6
-                            Repeater { model: Theme.staticNames
-                                delegate: Chip { required property var modelData; text: modelData === "none" ? "Neutral" : modelData; active: win.o.staticTheme === modelData
-                                    onClicked: win.o.staticTheme = modelData } } } }
+                            Repeater { model: Theme.darkThemes
+                                delegate: Chip { required property var modelData; text: modelData === "none" ? "Neutral" : modelData; active: win.o.darkTheme === modelData
+                                    onClicked: { win.o.darkTheme = modelData; win.o.themeMode = "dark"; } } } } }
+                    SettingRow { title: "Light theme"; desc: "Palette used when light mode is active."
+                        Flow { width: 410; spacing: 6
+                            Repeater { model: Theme.lightThemes
+                                delegate: Chip { required property var modelData; text: modelData === "none" ? "Neutral" : modelData; active: win.o.lightTheme === modelData
+                                    onClicked: { win.o.lightTheme = modelData; win.o.themeMode = "light"; } } } } }
                     Section { text: "Accent color" }
                     SettingRow { title: "Source"; desc: "Extract one dominant color from the wallpaper, or choose your own."
                         Segmented { options: [{ label: "From wallpaper", value: "wallpaper" }, { label: "Custom", value: "custom" }]; current: win.o.accentMode; onPicked: v => win.o.accentMode = v } }
@@ -184,7 +196,9 @@ Variants {
                     SettingRow { title: "Keep visible on empty workspace"; desc: "Do not auto-hide when there are no windows on the current workspace."; Sw { checked: win.o.barKeepOnEmpty; onToggled: v => win.o.barKeepOnEmpty = v } }
                     SettingRow { title: "Opacity"; desc: Math.round(win.o.barOpacity * 100) + "%"; Sl { value: win.o.barOpacity - 0.1; max: 0.9; onMoved: v => win.o.barOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Height"; desc: win.o.barHeight + " px"; Sl { value: win.o.barHeight - 28; max: 24; onMoved: v => win.o.barHeight = Math.round(v) + 28 } }
-                    SettingRow { title: "Scroll volume step"; desc: win.o.barScrollStep + "% when scrolling on empty bar space"; Sl { value: win.o.barScrollStep - 1; max: 19; onMoved: v => win.o.barScrollStep = Math.max(1, Math.round(v + 1)) } }
+                    SettingRow { title: "Scroll to change volume"; desc: "Scroll on empty bar space to adjust volume."; Sw { checked: win.o.barScrollVolume; onToggled: v => win.o.barScrollVolume = v } }
+                    SettingRow { title: "Scroll volume step"; visible: win.o.barScrollVolume; desc: win.o.barScrollStep + "% when scrolling on empty bar space"; Sl { value: win.o.barScrollStep - 1; max: 19; onMoved: v => win.o.barScrollStep = Math.max(1, Math.round(v + 1)) } }
+                    SettingRow { title: "Right-click opens Control Center"; desc: "Open Control Center at cursor when right-clicking empty bar space."; Sw { checked: win.o.barRightClickCc; onToggled: v => win.o.barRightClickCc = v } }
                     SettingRow { title: "Monitors"; desc: "Show a bar on every monitor or only the first."; Segmented { options: [{ label: "All", value: "all" }, { label: "Primary", value: "primary" }]; current: win.o.barMonitors; onPicked: v => win.o.barMonitors = v } }
                     Section { text: "Modules" }
                     SettingRow { title: "Window title"; Sw { checked: win.o.barShowTitle; onToggled: v => win.o.barShowTitle = v } }
@@ -277,7 +291,7 @@ Variants {
                             ["Alt + Tab / Shift", "Next / previous workspace"], ["Alt + Ctrl + Tab / Shift", "Move window to next / previous"],
                             ["Super + 1…0", "Go to workspace 1–10"], ["Super + Shift + 1…0", "Move window to workspace"],
                             ["Super + N", "Notifications"], ["Super + H", "Control center"], ["Super + Z", "Session panel"], ["Super + R", "Launcher"],
-                            ["Alt + `", "Workspace switcher"], ["Super + Shift + S", "Screenshot"], ["Super + V", "Clipboard history"],
+                            ["Alt + ` / Super + Tab", "Workspace switcher"], ["Super + Shift + S", "Screenshot"], ["Super + V", "Clipboard history"],
                             ["Super + I", "Settings"], ["Super + L", "Lock screen"], ["Super + Shift + W", "Wallpaper browser"], ["Super + Shift + R", "Toggle screen recording"],
                         ]
                         delegate: SettingRow { required property var modelData; title: modelData[1]

@@ -25,8 +25,21 @@ Singleton {
         if (m) return m.name;
         return Quickshell.screens.length ? Quickshell.screens[0].name : "";
     }
+    property real anchorX: -1
     function open(name, page) {
+        anchorX = -1;
         screenName = focusedScreen();
+        root.page = page ?? "";
+        active = name;
+    }
+    function openAt(name, page, screen, x) {
+        const targetScreen = screen || focusedScreen();
+        if (active === name && screenName === targetScreen && anchorX >= 0 && Math.abs(anchorX - x) < 28) {
+            close();
+            return;
+        }
+        anchorX = x ?? -1;
+        screenName = targetScreen;
         root.page = page ?? "";
         active = name;
     }

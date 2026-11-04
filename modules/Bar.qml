@@ -31,11 +31,12 @@ Variants {
         property int openTrayMenus: 0
         readonly property bool trayMenuOpen: openTrayMenus > 0
         readonly property bool anyPopupOpen: kbMenuOpen || calendarOpen || mediaPopupOpen || trayMenuOpen
-        readonly property int popupSpace: calendarOpen ? 324 : (kbMenuOpen ? 190 : (mediaPopupOpen ? 136 : 0))
+        readonly property int barZoneHeight: Config.o.barHeight + gap * 2
+        readonly property int popupMaxSpace: 324
         readonly property bool hidden: autoHide && !(Config.o.barKeepOnEmpty && wsEmpty) && !pointerInside && !anyPopupOpen && !Panels.active
         anchors { left: true; right: true; top: atTop; bottom: !atTop }
-        implicitHeight: Config.o.barHeight + gap * 2 + popupSpace
-        exclusiveZone: autoHide ? 0 : Config.o.barHeight + gap * 2
+        implicitHeight: barZoneHeight + popupMaxSpace
+        exclusiveZone: autoHide ? 0 : barZoneHeight
         exclusionMode: autoHide ? ExclusionMode.Ignore : ExclusionMode.Normal
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "hyprshell-bar"
@@ -119,16 +120,17 @@ Variants {
         }
         Item {
             id: trigger
-            width: parent.width; height: 3
+            width: parent.width
+            height: Math.max(4, win.gap + 2)
             anchors.top: win.atTop ? parent.top : undefined
             anchors.bottom: win.atTop ? undefined : parent.bottom
         }
         Item {
             id: maskArea
-            x: bar.x
-            y: win.atTop ? bar.y : 0
-            width: bar.width
-            height: win.popupSpace > 0 ? win.height : bar.height
+            x: 0
+            y: win.atTop ? 0 : (win.anyPopupOpen ? 0 : win.height - win.barZoneHeight)
+            width: win.width
+            height: win.anyPopupOpen ? win.height : win.barZoneHeight
         }
 
         // Click outside popups in popupSpace closes popups
@@ -157,16 +159,20 @@ Variants {
             border.width: Config.o.barFloating ? 1 : 0
             border.color: Theme.border
 
-            // Scroll on empty bar space changes volume
+            // Scroll on empty bar space changes volume; right-click opens Control Center at cursor
             MouseArea {
                 anchors.fill: parent
-                acceptedButtons: Qt.LeftButton
-                onClicked: {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: m => {
                     win.kbMenuOpen = false;
                     win.calendarOpen = false;
                     win.mediaPopupOpen = false;
+                    if (m.button === Qt.RightButton && Config.o.barRightClickCc) {
+                        Panels.openAt("controlcenter", "", win.screen.name, bar.x + m.x);
+                    }
                 }
                 onWheel: w => {
+                    if (!Config.o.barScrollVolume) return;
                     const step = (Config.o.barScrollStep || 5) / 100;
                     Audio.step(w.angleDelta.y > 0 ? step : -step);
                 }

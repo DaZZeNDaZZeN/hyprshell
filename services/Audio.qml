@@ -15,10 +15,12 @@ Singleton {
     readonly property bool micMuted: source?.audio?.muted ?? false
 
     readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream && n.audio)
+    readonly property var sources: Pipewire.nodes.values.filter(n => !n.isSink && !n.isStream && n.audio
+        && (!n.properties || !n.properties["media.class"] || n.properties["media.class"].startsWith("Audio/Source")))
     readonly property var streams: Pipewire.nodes.values.filter(n => n.isStream && n.audio
         && n.properties["media.class"] === "Stream/Output/Audio")
 
-    PwObjectTracker { objects: [root.sink, root.source].concat(root.streams).concat(root.sinks) }
+    PwObjectTracker { objects: [root.sink, root.source].concat(root.streams).concat(root.sinks).concat(root.sources) }
 
     function setVolume(v) { if (sink?.audio) { sink.audio.muted = false; sink.audio.volume = Math.max(0, Math.min(1.5, v)); } }
     function step(d) { setVolume(Math.round((volume + d) * 100) / 100); }
@@ -26,6 +28,7 @@ Singleton {
     function toggleMic() { if (source?.audio) source.audio.muted = !source.audio.muted; }
     function setMic(v) { if (source?.audio) source.audio.volume = Math.max(0, Math.min(1, v)); }
     function setDefault(n) { Pipewire.preferredDefaultAudioSink = n; }
+    function setDefaultSource(n) { Pipewire.preferredDefaultAudioSource = n; }
 
     function icon(vol, mute) {
         if (mute || vol <= 0) return "\ueee8";

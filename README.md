@@ -157,7 +157,7 @@ Configured in [`hypr/keybindings.lua`](./hypr/keybindings.lua):
 | Shortcut | Action |
 | :--- | :--- |
 | `Super + R` | Toggle Application Launcher |
-| `Alt + \`` (Grave) | Toggle Workspace Switcher (with static miniatures) |
+| `Alt + \`` (Grave) / `Super + Tab` | Toggle Workspace Switcher (with static miniatures) |
 | `Super + H` | Toggle Control Center |
 | `Super + N` | Toggle Notification Center |
 | `Super + I` | Toggle Settings Manager |
@@ -209,10 +209,100 @@ qs -c hyprshell ipc call shell wallpaper random
 
 ---
 
-## 6. Customization & Files
+## 6. Custom Themes (JSON)
+
+Hyprshell supports full custom theming through a hot-reloaded JSON file at **`~/.config/hyprshell/theme-overrides.json`**. Any changes saved to this file take effect immediately across the shell and (when **Sync toolkits** is enabled) automatically propagate to **Hyprland**, **GTK 3/4**, **Qt5/Qt6 (`qt6ct`)**, and **KDE (`kdeglobals`)**.
+
+### Opening the Theme File
+
+You can create and open `~/.config/hyprshell/theme-overrides.json` in two ways:
+1. **Via Settings GUI**: Open Settings (`Super + I`) → **Appearance** → **Custom styling** → click **Open** next to **Theme overrides**.
+2. **Via Terminal**:
+   ```bash
+   mkdir -p ~/.config/hyprshell
+   ${EDITOR:-nano} ~/.config/hyprshell/theme-overrides.json
+   ```
+
+### Supported JSON Keys
+
+All properties are optional — any key omitted falls back to your active static theme or Dark/Light base in [`config/Theme.qml`](./config/Theme.qml).
+
+| Key | Type | Default (Dark / Light) | Description |
+| :--- | :--- | :--- | :--- |
+| `"accent"` | `string` (Hex) | Wallpaper / `"#7aa2f7"` | Primary highlight color used for active indicators, buttons, sliders, and window borders. |
+| `"bg"` | `string` (Hex) | `"#121214"` / `"#f4f4f6"` | Base background color for bars, docks, overlays, and windows. |
+| `"surface"` | `string` (Hex) | `"#1c1c20"` / `"#ffffff"` | Elevated card, sidebar, popover, and control surface color. |
+| `"surface2"` | `string` (Hex) | `"#28282e"` / `"#e8e8ec"` | Secondary surface color for inputs, chips, and nested containers. |
+| `"text"` | `string` (Hex) | `"#ececf0"` / `"#1b1b1f"` | Primary foreground text and icon color. |
+| `"subtext"` | `string` (Hex) | `"#9a9aa6"` / `"#62626c"` | Muted secondary text, labels, and inactive icons. |
+| `"radius"` | `number` (Int) | `16` | Base corner radius in pixels (`radiusS` and `radiusL` scale automatically). |
+| `"font"` | `string` | `"Noto Sans"` | Primary UI font family across all shell modules. |
+
+> [!NOTE]
+> Derived tokens (`onAccent`, `accentDim`, `accentSoft`, `surface3`, `border`, `hover`, `panel`, `barPanel`, `dockPanel`, `widgetsPanel`, `card`, `radiusS`, `radiusL`) are computed automatically from the tokens above and your opacity settings in `config.json`.
+> Base mode (`"dark"` vs `"light"`) and separate Dark/Light theme presets (`darkTheme` and `lightTheme`) are controlled in `~/.config/hyprshell/config.json`.
+
+### Example Custom Themes (`~/.config/hyprshell/theme-overrides.json`)
+
+#### Tokyo Night
+```json
+{
+  "accent": "#7aa2f7",
+  "bg": "#1a1b26",
+  "surface": "#24283b",
+  "surface2": "#292e42",
+  "text": "#c0caf5",
+  "subtext": "#565f89",
+  "radius": 16,
+  "font": "Noto Sans"
+}
+```
+
+#### Dracula
+```json
+{
+  "accent": "#bd93f9",
+  "bg": "#1e1f29",
+  "surface": "#282a36",
+  "surface2": "#44475a",
+  "text": "#f8f8f2",
+  "subtext": "#6272a4"
+}
+```
+
+#### Kanagawa Wave
+```json
+{
+  "accent": "#7e9cd8",
+  "bg": "#1f1f28",
+  "surface": "#2a2a37",
+  "surface2": "#363646",
+  "text": "#dcd7ba",
+  "subtext": "#727169"
+}
+```
+
+#### Resetting to Default
+To disable custom JSON overrides and return to the GUI settings, replace the file contents with an empty JSON object `{}` or delete `~/.config/hyprshell/theme-overrides.json`:
+```bash
+echo '{}' > ~/.config/hyprshell/theme-overrides.json
+```
+
+### Exported Palette for External Scripts (`colors.json`)
+
+Whenever the active theme changes, [`scripts/apply-theme.py`](./scripts/apply-theme.py) writes the resolved palette to **`~/.config/hyprshell/colors.json`**:
+
+```json
+{"mode":"dark","accent":"#7aa2f7","bg":"#1a1b26","surface":"#24283b","text":"#c0caf5"}
+```
+
+You can read this file from external scripts or tools (e.g., `jq` in terminal/bar scripts) to match your active Hyprshell palette.
+
+---
+
+## 7. Other Customization & Files
 
 - **Shell Configuration**: Stored at `~/.config/hyprshell/config.json` and managed live via **Settings** (`Super + I`).
-- **Theme Token Overrides**: Edit `~/.config/hyprshell/theme-overrides.json` (accessible from **Settings → Appearance → Theme overrides**) to override any property in `Theme.qml` (`accent`, `bg`, `surface`, `text`, `radius`, etc.).
 - **Custom GTK CSS**: Edit `~/.config/hyprshell/custom-gtk.css` to append custom rules to GTK 3 and GTK 4.
 - **Qt6 / KDE Color Scheme**: Generated automatically at `~/.local/share/color-schemes/Hyprshell.colors` and applied to `qt6ct` (`~/.config/qt6ct/qt6ct.conf`) and `kdeglobals`.
 - **VM vs. Real Hardware**: [`beautification.lua`](./hypr/beautification.lua) and [`autostart.lua`](./hypr/autostart.lua) automatically detect QEMU/Virtio-GPU (`virtio-pci`) and enable `LIBGL_ALWAYS_SOFTWARE=1` only inside virtual machines. On bare-metal AMD, Intel, or NVIDIA GPUs, full hardware acceleration and DMA-BUF zero-copy rendering are used automatically.

@@ -23,7 +23,14 @@ Singleton {
         printErrors: false
         onFileChanged: reload()
         onAdapterUpdated: writeAdapter()
-        onLoaded: root.loaded = true
+        onLoaded: {
+            if (adapter.staticTheme && adapter.staticTheme !== "none") {
+                if (adapter.staticTheme === "latte") adapter.lightTheme = "latte";
+                else if (adapter.darkTheme === "none") adapter.darkTheme = adapter.staticTheme;
+                adapter.staticTheme = "none";
+            }
+            root.loaded = true;
+        }
         onLoadFailed: error => { writeAdapter(); root.loaded = true; }
 
         adapter: JsonAdapter {
@@ -31,7 +38,9 @@ Singleton {
 
             // ---- appearance ----
             property string themeMode: "dark"          // dark | light
-            property string staticTheme: "none"        // none | nord | gruvbox | mocha | rosepine | latte
+            property string darkTheme: "none"          // none | nord | gruvbox | mocha | rosepine | tokyonight | kanagawa
+            property string lightTheme: "none"         // none | latte | dawn | gruvbox-light | nord-light | tokyonight-day | lotus
+            property string staticTheme: "none"        // legacy migration key
             property string accentMode: "wallpaper"    // wallpaper | custom
             property string customAccent: "#7aa2f7"
             property string wallpaperAccent: "#7aa2f7"
@@ -61,7 +70,9 @@ Singleton {
             property bool barShowLayout: true
             property bool barClock24h: true
             property bool barSeconds: false
+            property bool barScrollVolume: true
             property int barScrollStep: 5
+            property bool barRightClickCc: true
             property string barMonitors: "all"         // all | primary
 
             // ---- dock ----

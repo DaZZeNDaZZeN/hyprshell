@@ -36,6 +36,7 @@ hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(ipc .. "lock"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd(ipc .. "toggle wallhaven"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd(ipc .. "record"))
 hl.bind("ALT + GRAVE", hl.dsp.exec_cmd(ipc .. "toggle workspaces"))
+hl.bind(mainMod .. " + TAB", hl.dsp.exec_cmd(ipc .. "toggle workspaces"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd(ipc .. "screenshot region"))
 
 -- Move focus with mainMod + arrow keys

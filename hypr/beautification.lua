@@ -213,12 +213,11 @@ hl.window_rule({
 })
 
 -- Layer rules also return a handle.
--- local overlayLayerRule = hl.layer_rule({
---     name  = "no-anim-overlay",
---     match = { namespace = "^my-overlay$" },
---     no_anim = true,
--- })
--- overlayLayerRule:set_enabled(false)
+hl.layer_rule({
+	name = "hyprshell-no-layer-anim",
+	match = { namespace = "^hyprshell-(bar|dock|osd)$" },
+	no_anim = true,
+})
 
 -- Hyprland-run windowrule
 hl.window_rule({
