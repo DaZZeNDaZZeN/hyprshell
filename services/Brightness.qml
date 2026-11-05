@@ -11,6 +11,7 @@ Singleton {
     property string device: ""
     property int max: 100
     property int raw: 100
+    property bool initialized: false
     readonly property bool available: device !== "" && max > 0
     property real virtualValue: 1.0
     readonly property real value: available ? (max > 0 ? raw / max : 0) : virtualValue
@@ -23,16 +24,26 @@ Singleton {
     FileView {
         id: maxFile
         path: root.device ? "/sys/class/backlight/" + root.device + "/max_brightness" : ""
-        onLoaded: root.max = parseInt(text())
+        onLoaded: {
+            const m = parseInt(text());
+            if (!isNaN(m) && m > 0) root.max = m;
+        }
     }
     FileView {
         id: curFile
         path: root.device ? "/sys/class/backlight/" + root.device + "/brightness" : ""
         onLoaded: {
             const v = parseInt(text());
-            const first = root.raw === 100;
-            root.raw = v;
-            if (!first) Osd.show("brightness", "\uf185", Math.round(root.value * 100) + "%", root.value, "Brightness");
+            if (isNaN(v)) return;
+            if (!root.initialized) {
+                root.raw = v;
+                root.initialized = true;
+                return;
+            }
+            if (v !== root.raw) {
+                root.raw = v;
+                Osd.show("brightness", "\uf185", Math.round(root.value * 100) + "%", root.value, "Brightness");
+            }
         }
     }
     Timer { interval: 1500; running: root.available; repeat: true; onTriggered: curFile.reload() }
