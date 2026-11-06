@@ -43,7 +43,11 @@ Variants {
                 Label { width: parent.width; text: t.label; color: t.fg; font.weight: Font.Medium }
                 Label { width: parent.width; visible: text !== ""; text: t.sub; color: t.fg; opacity: 0.75; font.pixelSize: Theme.fsS }
             }
-            MouseArea { id: ma; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: t.clicked() }
+            MouseArea {
+                id: ma; anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: m => { if (m.button === Qt.RightButton) { if (t.expandable) t.expand(); } else t.clicked(); }
+            }
             Icon {
                 visible: t.expandable
                 anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
