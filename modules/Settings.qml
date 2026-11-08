@@ -211,7 +211,18 @@ Variants {
 
                 // ================= Dock =================
                 Page {
+                    id: dockPage
                     key: "dock"
+                    property int pinDragFrom: -1
+                    property int pinDragTarget: -1
+                    property real pinDragOffsetY: 0
+                    function movePinned(fromIdx, toIdx) {
+                        const arr = win.o.dockPinned.slice();
+                        if (fromIdx < 0 || toIdx < 0 || fromIdx >= arr.length || toIdx >= arr.length || fromIdx === toIdx) return;
+                        const [moved] = arr.splice(fromIdx, 1);
+                        arr.splice(toIdx, 0, moved);
+                        win.o.dockPinned = arr;
+                    }
                     Section { text: "Dock" }
                     SettingRow { title: "Enable dock"; Sw { checked: win.o.dockEnabled; onToggled: v => win.o.dockEnabled = v } }
                     SettingRow { title: "Floating"; desc: "Off = attached to the screen edge across the full width."; Sw { checked: win.o.dockFloating; onToggled: v => win.o.dockFloating = v } }
@@ -219,20 +230,147 @@ Variants {
                     SettingRow { title: "Keep visible on empty workspace"; desc: "Do not auto-hide when there are no windows on the current workspace."; Sw { checked: win.o.dockKeepOnEmpty; onToggled: v => win.o.dockKeepOnEmpty = v } }
                     SettingRow { title: "Opacity"; desc: Math.round(win.o.dockOpacity * 100) + "%"; Sl { value: win.o.dockOpacity - 0.1; max: 0.9; onMoved: v => win.o.dockOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Icon size"; desc: win.o.dockIconSize + " px"; Sl { value: win.o.dockIconSize - 28; max: 44; onMoved: v => win.o.dockIconSize = Math.round(v) + 28 } }
-                    Section { text: "Pinned apps" }
+                    SettingRow {
+                        title: "App ordering"
+                        desc: win.o.dockOrder === "pinned"
+                            ? "1. Pinned apps  2. Other open apps by opening order (drag any app within its group)"
+                            : "1. Open apps by workspace position  2. Closed pinned apps (drag closed pinned apps)"
+                        Segmented {
+                            options: [
+                                { label: "Workspace", value: "workspace" },
+                                { label: "Pinned first", value: "pinned" }
+                            ]
+                            current: win.o.dockOrder
+                            onPicked: v => win.o.dockOrder = v
+                        }
+                    }
+                    Section { text: "Pinned apps (drag or use arrows to reorder)" }
                     Repeater {
                         model: win.o.dockPinned
-                        delegate: SettingRow {
+                        delegate: Rectangle {
+                            id: pinRow
                             required property var modelData
+                            required property int index
                             readonly property var entry: Apps.lookup(modelData)
-                            title: entry ? entry.name : modelData; desc: modelData
-                            Button { text: "Remove"; danger: true; onClicked: win.o.dockPinned = win.o.dockPinned.filter(p => p !== modelData) }
+                            readonly property bool isBeingDragged: dockPage.pinDragFrom === index
+                            readonly property real stepH: 52
+                            readonly property real shiftY: {
+                                if (dockPage.pinDragFrom < 0 || isBeingDragged) return 0;
+                                if (dockPage.pinDragFrom < dockPage.pinDragTarget && index > dockPage.pinDragFrom && index <= dockPage.pinDragTarget) return -stepH;
+                                if (dockPage.pinDragFrom > dockPage.pinDragTarget && index >= dockPage.pinDragTarget && index < dockPage.pinDragFrom) return stepH;
+                                return 0;
+                            }
+                            Layout.fillWidth: true
+                            height: 52
+                            z: isBeingDragged ? 10 : 1
+                            radius: Theme.radiusS + 2
+                            color: isBeingDragged ? Theme.surface2 : "transparent"
+                            border.width: isBeingDragged ? 1 : 0
+                            border.color: Theme.accent
+                            transform: Translate {
+                                y: pinRow.isBeingDragged ? dockPage.pinDragOffsetY : pinRow.shiftY
+                                Behavior on y { enabled: !pinRow.isBeingDragged; NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic } }
+                            }
+
+                            RowLayout {
+                                anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+                                spacing: 10
+                                Icon {
+                                    text: "\uf0c9"
+                                    font.pixelSize: 13
+                                    tint: dragMa.containsMouse || pinRow.isBeingDragged ? Theme.accent : Theme.subtext
+                                }
+                                Image {
+                                    width: 28; height: 28
+                                    sourceSize: Qt.size(56, 56)
+                                    source: Apps.iconFor(pinRow.entry?.icon ?? pinRow.modelData)
+                                }
+                                Column {
+                                    Layout.fillWidth: true
+                                    Label { text: pinRow.entry ? pinRow.entry.name : pinRow.modelData; font.weight: Font.Medium }
+                                    Label { text: pinRow.modelData; color: Theme.subtext; font.pixelSize: Theme.fsS }
+                                }
+                                IconButton {
+                                    glyph: "\uf077"
+                                    size: 28; iconSize: 11
+                                    opacity: pinRow.index > 0 ? 1 : 0.35
+                                    onClicked: if (pinRow.index > 0) dockPage.movePinned(pinRow.index, pinRow.index - 1)
+                                }
+                                IconButton {
+                                    glyph: "\uf078"
+                                    size: 28; iconSize: 11
+                                    opacity: pinRow.index < win.o.dockPinned.length - 1 ? 1 : 0.35
+                                    onClicked: if (pinRow.index < win.o.dockPinned.length - 1) dockPage.movePinned(pinRow.index, pinRow.index + 1)
+                                }
+                                Button {
+                                    text: "Remove"
+                                    danger: true
+                                    onClicked: win.o.dockPinned = win.o.dockPinned.filter(p => p !== pinRow.modelData)
+                                }
+                            }
+
+                            MouseArea {
+                                id: dragMa
+                                anchors { left: parent.left; top: parent.top; bottom: parent.bottom; right: parent.right; rightMargin: 165 }
+                                hoverEnabled: true
+                                cursorShape: pinRow.isBeingDragged ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                property real pressY: 0
+                                property bool dragging: false
+                                onPressed: m => {
+                                    pressY = m.y;
+                                    dragging = false;
+                                    dockPage.interactive = false;
+                                }
+                                onPositionChanged: m => {
+                                    if (!pressed) return;
+                                    const dy = m.y - pressY + (pinRow.isBeingDragged ? dockPage.pinDragOffsetY : 0);
+                                    if (!dragging && Math.abs(dy) > 4) {
+                                        dragging = true;
+                                        dockPage.pinDragFrom = pinRow.index;
+                                        dockPage.pinDragTarget = pinRow.index;
+                                    }
+                                    if (dragging && dockPage.pinDragFrom === pinRow.index) {
+                                        const count = win.o.dockPinned.length;
+                                        const minDy = -pinRow.index * pinRow.stepH;
+                                        const maxDy = (count - 1 - pinRow.index) * pinRow.stepH;
+                                        const clampedDy = Math.max(minDy, Math.min(maxDy, dy));
+                                        dockPage.pinDragOffsetY = clampedDy;
+                                        const slotOffset = Math.round(clampedDy / pinRow.stepH);
+                                        dockPage.pinDragTarget = Math.max(0, Math.min(count - 1, pinRow.index + slotOffset));
+                                    }
+                                }
+                                onReleased: {
+                                    dockPage.interactive = true;
+                                    if (dragging && dockPage.pinDragFrom === pinRow.index) {
+                                        const from = dockPage.pinDragFrom;
+                                        const to = dockPage.pinDragTarget;
+                                        dockPage.pinDragFrom = -1;
+                                        dockPage.pinDragTarget = -1;
+                                        dockPage.pinDragOffsetY = 0;
+                                        dockPage.movePinned(from, to);
+                                    }
+                                    dragging = false;
+                                }
+                                onCanceled: {
+                                    dockPage.interactive = true;
+                                    dockPage.pinDragFrom = -1;
+                                    dockPage.pinDragTarget = -1;
+                                    dockPage.pinDragOffsetY = 0;
+                                    dragging = false;
+                                }
+                            }
+                            Rectangle {
+                                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                height: 1
+                                color: Theme.border
+                                visible: !pinRow.isBeingDragged
+                            }
                         }
                     }
                     SettingRow { title: "Pin an app"; desc: "Desktop file id, e.g. org.kde.konsole"
                         TextField { id: pinId; width: 220; placeholder: "app id"; onAccepted: { if (text) { win.o.dockPinned = win.o.dockPinned.concat([text]); text = ""; } } }
                         Button { text: "Add"; primary: true; onClicked: { if (pinId.text) { win.o.dockPinned = win.o.dockPinned.concat([pinId.text]); pinId.text = ""; } } } }
-                    Label { Layout.topMargin: 8; text: "Tip: right-click any dock icon to pin or unpin it."; color: Theme.subtext; font.pixelSize: Theme.fsS + 1 }
+                    Label { Layout.topMargin: 8; text: "Tip: right-click any dock icon to pin or unpin it, or drag icons directly on the dock."; color: Theme.subtext; font.pixelSize: Theme.fsS + 1 }
                 }
 
                 // ================= Widgets =================
@@ -276,8 +414,16 @@ Variants {
                         Repeater { model: ["top-right", "top-left", "bottom-right", "bottom-left"]
                             delegate: Chip { required property var modelData; text: modelData; active: win.o.notifPosition === modelData; onClicked: win.o.notifPosition = modelData } } } }
                     Section { text: "On-screen display" }
-                    SettingRow { title: "Enable OSD"; desc: "Volume, brightness, media, layout and lock keys."; Sw { checked: win.o.osdEnabled; onToggled: v => win.o.osdEnabled = v } }
+                    SettingRow { title: "Enable OSD"; desc: "Master switch for all on-screen display popups."; Sw { checked: win.o.osdEnabled; onToggled: v => win.o.osdEnabled = v } }
                     SettingRow { title: "OSD duration"; desc: win.o.osdTimeout + " ms"; Sl { value: win.o.osdTimeout - 600; max: 3400; onMoved: v => win.o.osdTimeout = Math.round((v + 600) / 100) * 100 } }
+                    Section { text: "OSD categories" }
+                    SettingRow { title: "Volume"; desc: "Speaker volume changes and mute state."; Sw { checked: win.o.osdVolume; onToggled: v => win.o.osdVolume = v } }
+                    SettingRow { title: "Microphone"; desc: "Microphone mute/unmute state."; Sw { checked: win.o.osdMic; onToggled: v => win.o.osdMic = v } }
+                    SettingRow { title: "Brightness"; desc: "Screen backlight changes."; Sw { checked: win.o.osdBrightness; onToggled: v => win.o.osdBrightness = v } }
+                    SettingRow { title: "Media playback"; desc: "Track changes and play/pause."; Sw { checked: win.o.osdMedia; onToggled: v => win.o.osdMedia = v } }
+                    SettingRow { title: "Keyboard layout"; desc: "Active keyboard layout switches."; Sw { checked: win.o.osdLayout; onToggled: v => win.o.osdLayout = v } }
+                    SettingRow { title: "Lock keys"; desc: "Caps Lock, Num Lock, and Scroll Lock indicators."; Sw { checked: win.o.osdLockKeys; onToggled: v => win.o.osdLockKeys = v } }
+                    SettingRow { title: "Do Not Disturb"; desc: "Do Not Disturb toggle notifications."; Sw { checked: win.o.osdDnd; onToggled: v => win.o.osdDnd = v } }
                 }
 
                 // ================= Keybindings =================

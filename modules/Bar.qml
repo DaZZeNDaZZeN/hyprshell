@@ -462,8 +462,8 @@ Variants {
             scale: win.mediaPopupOpen ? 1 : 0.94
             Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
             Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-            width: 320
-            height: 112
+            width: 340
+            height: 174
             x: Math.min(win.width - width - 10, Math.max(10, bar.x + centerRow.x + mediaPill.x + mediaPill.width / 2 - width / 2))
             y: win.atTop ? (bar.y + bar.height + 6) : (bar.y - height - 6)
             radius: Theme.radiusL
@@ -475,7 +475,7 @@ Variants {
 
             Rectangle {
                 id: mArt
-                x: 14; y: 14; width: 84; height: 84
+                x: 14; y: 14; width: 78; height: 78
                 radius: Theme.radius
                 color: Theme.surface3
                 clip: true
@@ -496,8 +496,8 @@ Variants {
             }
 
             Column {
-                anchors { left: mArt.right; leftMargin: 14; right: parent.right; rightMargin: 14; top: parent.top; topMargin: 14 }
-                spacing: 3
+                anchors { left: mArt.right; leftMargin: 14; right: parent.right; rightMargin: 14; top: parent.top; topMargin: 12 }
+                spacing: 2
                 Label {
                     width: parent.width
                     text: Media.title || "Unknown track"
@@ -513,11 +513,67 @@ Variants {
             }
 
             Row {
-                anchors { left: mArt.right; leftMargin: 14; bottom: parent.bottom; bottomMargin: 12 }
+                anchors { left: mArt.right; leftMargin: 14; top: mArt.bottom; topMargin: -32 }
                 spacing: 8
-                IconButton { glyph: "\uf048"; size: 32; iconSize: 12; onClicked: Media.previous() }
-                IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 32; iconSize: 12; active: true; onClicked: Media.playPause() }
-                IconButton { glyph: "\uf051"; size: 32; iconSize: 12; onClicked: Media.next() }
+                IconButton { glyph: "\uf048"; size: 30; iconSize: 11; onClicked: Media.previous() }
+                IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 30; iconSize: 11; active: true; onClicked: Media.playPause() }
+                IconButton { glyph: "\uf051"; size: 30; iconSize: 11; onClicked: Media.next() }
+            }
+
+            ColumnLayout {
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 14; bottomMargin: 12 }
+                spacing: 6
+
+                // Duration / Seek slider
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Label {
+                        text: Media.formatTime(Media.position)
+                        font.pixelSize: Theme.fsS
+                        color: Theme.subtext
+                        Layout.preferredWidth: 32
+                    }
+                    Slider {
+                        Layout.fillWidth: true
+                        implicitHeight: 20
+                        opacity: Media.length > 0 ? 1 : 0.45
+                        value: Media.length > 0 ? Media.position / Media.length : 0
+                        onMoved: v => Media.seekRatio(v)
+                    }
+                    Label {
+                        text: Media.formatTime(Media.length)
+                        font.pixelSize: Theme.fsS
+                        color: Theme.subtext
+                        horizontalAlignment: Text.AlignRight
+                        Layout.preferredWidth: 32
+                    }
+                }
+
+                // Volume slider
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    IconButton {
+                        glyph: Audio.icon(Media.volume, Media.muted)
+                        size: 24
+                        iconSize: 12
+                        onClicked: Media.toggleMute()
+                    }
+                    Slider {
+                        Layout.fillWidth: true
+                        implicitHeight: 20
+                        value: Media.muted ? 0 : Media.volume
+                        onMoved: v => Media.setVolume(v)
+                    }
+                    Label {
+                        text: Math.round((Media.muted ? 0 : Media.volume) * 100) + "%"
+                        font.pixelSize: Theme.fsS
+                        color: Theme.subtext
+                        horizontalAlignment: Text.AlignRight
+                        Layout.preferredWidth: 32
+                    }
+                }
             }
         }
 

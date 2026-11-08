@@ -14,13 +14,14 @@ Singleton {
     readonly property real micVolume: source?.audio?.volume ?? 0
     readonly property bool micMuted: source?.audio?.muted ?? false
 
-    readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream && n.audio)
-    readonly property var sources: Pipewire.nodes.values.filter(n => !n.isSink && !n.isStream && n.audio
+    readonly property var audioNodes: Pipewire.nodes.values.filter(n => n && n.audio !== null)
+    readonly property var sinks: audioNodes.filter(n => !n.isStream && n.isSink)
+    readonly property var sources: audioNodes.filter(n => !n.isStream && !n.isSink
         && (!n.properties || !n.properties["media.class"] || n.properties["media.class"].startsWith("Audio/Source")))
-    readonly property var streams: Pipewire.nodes.values.filter(n => n.isStream && n.audio
-        && n.properties["media.class"] === "Stream/Output/Audio")
+    readonly property var streams: audioNodes.filter(n => n.isStream && (n.isSink
+        || (n.properties && n.properties["media.class"] === "Stream/Output/Audio")))
 
-    PwObjectTracker { objects: [root.sink, root.source].concat(root.streams).concat(root.sinks).concat(root.sources) }
+    PwObjectTracker { objects: [root.sink, root.source].concat(root.audioNodes) }
 
     function setVolume(v) { if (sink?.audio) { sink.audio.muted = false; sink.audio.volume = Math.max(0, Math.min(1.5, v)); } }
     function step(d) { setVolume(Math.round((volume + d) * 100) / 100); }
@@ -40,12 +41,15 @@ Singleton {
         return "\uf028";
     }
     function nodeName(n) {
-        const p = n.properties;
-        return p["application.name"] || n.nickname || n.description || n.name;
+        if (!n) return "";
+        const p = n.properties ?? ({});
+        const app = p["application.name"] || p["node.nick"] || n.nickname || n.description || n.name || "Application";
+        const media = p["media.name"];
+        return (media && media !== app && !app.toLowerCase().includes(media.toLowerCase())) ? (app + " — " + media) : app;
     }
 
     function osd() { Osd.show("volume", icon(volume, muted), muted ? "Muted" : Math.round(volume * 100) + "%", Math.min(1, volume), "Volume", !muted); }
     onVolumeChanged: osd()
     onMutedChanged: osd()
-    onMicMutedChanged: Osd.show("volume", micMuted ? "\uf131" : "\uf130", micMuted ? "Mic muted" : "Mic on", -1, "Microphone", !micMuted)
+    onMicMutedChanged: Osd.show("mic", micMuted ? "\uf131" : "\uf130", micMuted ? "Mic muted" : "Mic on", -1, "Microphone", !micMuted)
 }

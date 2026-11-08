@@ -81,6 +81,7 @@ Singleton {
             property bool dockAutoHide: true
             property bool dockKeepOnEmpty: true
             property int dockIconSize: 44
+            property string dockOrder: "workspace"     // workspace | pinned
             property var dockPinned: ["firefox", "org.kde.dolphin", "kitty"]
 
             // ---- launcher ----
@@ -95,6 +96,13 @@ Singleton {
             // ---- osd ----
             property bool osdEnabled: true
             property int osdTimeout: 1600
+            property bool osdVolume: true
+            property bool osdMic: true
+            property bool osdBrightness: true
+            property bool osdMedia: true
+            property bool osdLayout: true
+            property bool osdLockKeys: true
+            property bool osdDnd: true
 
             // ---- desktop widgets ----
             property bool widgetsEnabled: true

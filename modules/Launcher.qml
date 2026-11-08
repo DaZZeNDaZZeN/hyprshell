@@ -163,14 +163,44 @@ Variants {
             top.push({ title: "Search the web for “" + q + "”", sub: "Web", glyph: "\uf002", run: () => Quickshell.execDetached(["xdg-open", Config.o.webSearchUrl + encodeURIComponent(q)]) });
             return top;
         }
-        function update() { results = compute(input.text); sel = 0; list.positionViewAtBeginning(); }
+        function update() {
+            mouseMoved = false;
+            initMouseX = -1;
+            initMouseY = -1;
+            results = compute(input.text);
+            sel = 0;
+            list.positionViewAtBeginning();
+        }
         function activate() {
             const r = results[sel];
             if (!r) return;
             Panels.close();
             r.run();
         }
-        onOpenChanged: if (open) Qt.callLater(() => { calcExpr = ""; calcResult = ""; calcFull = ""; pendingCalcExpr = ""; input.text = ""; update(); input.forceActiveFocus(); })
+        property bool mouseMoved: false
+        property real initMouseX: -1
+        property real initMouseY: -1
+        HoverHandler {
+            id: winHover
+            onPointChanged: {
+                if (!win.open) return;
+                const p = point.position;
+                if (win.initMouseX < 0) {
+                    win.initMouseX = p.x;
+                    win.initMouseY = p.y;
+                } else if (Math.abs(p.x - win.initMouseX) > 2 || Math.abs(p.y - win.initMouseY) > 2) {
+                    win.mouseMoved = true;
+                    win.initMouseX = p.x;
+                    win.initMouseY = p.y;
+                }
+            }
+        }
+        onOpenChanged: if (open) {
+            mouseMoved = false;
+            initMouseX = -1;
+            initMouseY = -1;
+            Qt.callLater(() => { calcExpr = ""; calcResult = ""; calcFull = ""; pendingCalcExpr = ""; input.text = ""; update(); input.forceActiveFocus(); });
+        }
 
         PopupCard {
             id: card
@@ -190,9 +220,9 @@ Variants {
                 placeholder: "Search apps, windows, actions…   (= calc  > run  ? web)"
                 onEdited: win.update()
                 onAccepted: win.activate()
-                input.Keys.onDownPressed: win.sel = Math.min(win.results.length - 1, win.sel + 1)
-                input.Keys.onUpPressed: win.sel = Math.max(0, win.sel - 1)
-                input.Keys.onTabPressed: win.sel = (win.sel + 1) % Math.max(1, win.results.length)
+                input.Keys.onDownPressed: { win.mouseMoved = false; win.initMouseX = -1; win.sel = Math.min(win.results.length - 1, win.sel + 1); }
+                input.Keys.onUpPressed: { win.mouseMoved = false; win.initMouseX = -1; win.sel = Math.max(0, win.sel - 1); }
+                input.Keys.onTabPressed: { win.mouseMoved = false; win.initMouseX = -1; win.sel = (win.sel + 1) % Math.max(1, win.results.length); }
                 input.Keys.onEscapePressed: Panels.close()
             }
             ListView {
@@ -223,13 +253,8 @@ Variants {
                     }
                     MouseArea {
                         anchors.fill: parent; hoverEnabled: true
-                        property real lastX: -1
-                        property real lastY: -1
-                        onPositionChanged: m => {
-                            if (lastX >= 0 && (Math.abs(m.x - lastX) > 1 || Math.abs(m.y - lastY) > 1)) win.sel = row.index;
-                            lastX = m.x; lastY = m.y;
-                        }
-                        onExited: { lastX = -1; lastY = -1; }
+                        onEntered: if (win.mouseMoved) win.sel = row.index
+                        onPositionChanged: if (win.mouseMoved) win.sel = row.index
                         onClicked: { win.sel = row.index; win.activate(); }
                     }
                 }

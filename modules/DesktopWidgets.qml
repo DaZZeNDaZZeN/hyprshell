@@ -114,17 +114,51 @@ Variants {
             // media
             Widget {
                 visible: Config.o.widgetMedia && Media.player !== null
-                Layout.fillWidth: true; implicitHeight: 92
+                Layout.fillWidth: true; implicitHeight: 152
                 Rectangle { id: art; x: 12; y: 12; width: 68; height: 68; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
                     Image { anchors.fill: parent; source: Media.art; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(136, 136) }
                     Icon { anchors.centerIn: parent; text: "\uf001"; tint: Theme.subtext; visible: !Media.art } }
-                Column { anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: parent.top; topMargin: 14 } spacing: 2
-                    Label { width: parent.width; text: Media.title; font.weight: Font.DemiBold }
-                    Label { width: parent.width; text: Media.artist; color: Theme.subtext; font.pixelSize: Theme.fsS + 1 } }
-                Row { anchors { left: art.right; leftMargin: 6; bottom: parent.bottom; bottomMargin: 8 } spacing: 2
+                Column { anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: parent.top; topMargin: 12 } spacing: 2
+                    Label { width: parent.width; text: Media.title || "Unknown track"; font.weight: Font.DemiBold }
+                    Label { width: parent.width; text: Media.artist || (Media.player?.identity ?? ""); color: Theme.subtext; font.pixelSize: Theme.fsS + 1 } }
+                Row { anchors { left: art.right; leftMargin: 10; top: art.bottom; topMargin: -28 } spacing: 4
                     IconButton { glyph: "\uf048"; size: 28; iconSize: 11; onClicked: Media.previous() }
                     IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 28; iconSize: 11; active: true; onClicked: Media.playPause() }
                     IconButton { glyph: "\uf051"; size: 28; iconSize: 11; onClicked: Media.next() } }
+                ColumnLayout {
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 12; bottomMargin: 10 }
+                    spacing: 4
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Label { text: Media.formatTime(Media.position); font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 30 }
+                        Slider {
+                            Layout.fillWidth: true
+                            implicitHeight: 18
+                            opacity: Media.length > 0 ? 1 : 0.45
+                            value: Media.length > 0 ? Media.position / Media.length : 0
+                            onMoved: v => Media.seekRatio(v)
+                        }
+                        Label { text: Media.formatTime(Media.length); font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 30 }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        IconButton {
+                            glyph: Audio.icon(Media.volume, Media.muted)
+                            size: 22
+                            iconSize: 11
+                            onClicked: Media.toggleMute()
+                        }
+                        Slider {
+                            Layout.fillWidth: true
+                            implicitHeight: 18
+                            value: Media.muted ? 0 : Media.volume
+                            onMoved: v => Media.setVolume(v)
+                        }
+                        Label { text: Math.round((Media.muted ? 0 : Media.volume) * 100) + "%"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 30 }
+                    }
+                }
             }
             // app links
             Widget {

@@ -27,10 +27,15 @@ Variants {
         property string menuKey: ""
         property string hoverKey: ""
         property real hoverCenterX: win.width / 2
-        readonly property var hoveredEntry: entries.find(e => e.key === hoverKey) ?? null
-        readonly property bool previewShown: menuKey === "" && hoveredEntry !== null && hoveredEntry.tops.length > 0
+        property var openOrder: []
+        property int dragFromIdx: -1
+        property int dragTargetIdx: -1
+        property real dragOffsetX: 0
+        readonly property bool isDragging: dragFromIdx >= 0
+        readonly property var hoveredEntry: !isDragging ? (entries.find(e => e.key === hoverKey) ?? null) : null
+        readonly property bool previewShown: !isDragging && menuKey === "" && hoveredEntry !== null && hoveredEntry.tops.length > 0
         readonly property int extraTopSpace: 196
-        readonly property bool hidden: autoHide && !(Config.o.dockKeepOnEmpty && wsEmpty) && !pointerInside && menuKey === "" && !previewShown && !Panels.active
+        readonly property bool hidden: autoHide && !(Config.o.dockKeepOnEmpty && wsEmpty) && !pointerInside && menuKey === "" && !previewShown && !isDragging && !Panels.active
 
         anchors { left: true; right: true; bottom: true }
         implicitHeight: dockH + gap * 2 + extraTopSpace
@@ -41,16 +46,45 @@ Variants {
         color: "transparent"
         mask: Region { item: win.hidden ? trigger : maskItem }
 
-        // Apps shown in the dock: ordered by their workspace and leftmost window position (non-running pinned apps follow).
+        function canonId(id) {
+            return (Apps.lookup(id)?.id ?? id ?? "").toLowerCase();
+        }
+
+        function syncOpenOrder() {
+            const tops = ToplevelManager.toplevels.values;
+            const runningKeys = [];
+            for (const t of tops) {
+                const k = canonId(t.appId);
+                if (k && !runningKeys.includes(k)) runningKeys.push(k);
+            }
+            const next = win.openOrder.filter(k => runningKeys.includes(k));
+            for (const k of runningKeys) {
+                if (!next.includes(k)) next.push(k);
+            }
+            if (next.length !== win.openOrder.length || next.some((k, i) => k !== win.openOrder[i])) {
+                win.openOrder = next;
+            }
+        }
+
+        Connections {
+            target: ToplevelManager.toplevels
+            function onValuesChanged() { win.syncOpenOrder(); }
+        }
+
+        // Apps shown in the dock:
+        // - "workspace": 1. all opened apps ordered by workspace & leftmost window, 2. all closed pinned apps
+        // - "pinned":    1. all pinned apps, 2. other opened apps in order of opening
         readonly property var entries: {
             const tops = ToplevelManager.toplevels.values;
             const hyprTops = Hyprland.toplevels.values;
-            const canon = id => (Apps.lookup(id)?.id ?? id).toLowerCase();
+            const orderMode = Config.o.dockOrder;
+            const openOrd = win.openOrder;
             const list = Config.o.dockPinned.map((p, idx) => ({
                 id: p,
-                key: canon(p),
+                key: canonId(p),
                 pinned: true,
                 pinIdx: idx,
+                openIdx: -1,
                 tops: [],
                 minWs: Infinity,
                 minX: Infinity,
@@ -67,21 +101,24 @@ Variants {
                 return { ws: ws, x: x, y: y };
             }
 
-            let nextIdx = list.length;
+            let nextIdx = 0;
             for (const t of tops) {
-                const k = canon(t.appId);
+                const k = canonId(t.appId);
                 let e = list.find(x => x.key === k);
                 if (!e) {
+                    const oIdx = openOrd.indexOf(k);
                     e = {
                         id: t.appId,
                         key: k,
                         pinned: false,
-                        pinIdx: nextIdx++,
+                        pinIdx: 9999 + nextIdx,
+                        openIdx: oIdx >= 0 ? oIdx : (1000 + nextIdx),
                         tops: [],
                         minWs: Infinity,
                         minX: Infinity,
                         minY: Infinity
                     };
+                    nextIdx++;
                     list.push(e);
                 }
                 e.tops.push(t);
@@ -98,19 +135,102 @@ Variants {
                 }
             }
 
-            list.sort((a, b) => {
-                const aRun = a.tops.length > 0;
-                const bRun = b.tops.length > 0;
-                if (aRun !== bRun) return aRun ? -1 : 1;
-                if (aRun) {
-                    if (a.minWs !== b.minWs) return a.minWs - b.minWs;
-                    if (a.minX !== b.minX) return a.minX - b.minX;
-                    if (a.minY !== b.minY) return a.minY - b.minY;
-                }
-                return a.pinIdx - b.pinIdx;
-            });
+            if (orderMode === "pinned") {
+                list.sort((a, b) => {
+                    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                    if (a.pinned) return a.pinIdx - b.pinIdx;
+                    return a.openIdx - b.openIdx;
+                });
+            } else {
+                list.sort((a, b) => {
+                    const aRun = a.tops.length > 0;
+                    const bRun = b.tops.length > 0;
+                    if (aRun !== bRun) return aRun ? -1 : 1;
+                    if (aRun) {
+                        if (a.minWs !== b.minWs) return a.minWs - b.minWs;
+                        if (a.minX !== b.minX) return a.minX - b.minX;
+                        if (a.minY !== b.minY) return a.minY - b.minY;
+                    }
+                    return a.pinIdx - b.pinIdx;
+                });
+            }
 
             return list;
+        }
+
+        function canDragEntry(idx) {
+            const e = entries[idx];
+            if (!e) return false;
+            if (Config.o.dockOrder === "pinned") return true;
+            return e.pinned && e.tops.length === 0;
+        }
+
+        function dragGroupBounds(idx) {
+            const e = entries[idx];
+            if (!e) return { min: idx, max: idx };
+            if (Config.o.dockOrder === "pinned") {
+                let min = idx, max = idx;
+                while (min > 0 && entries[min - 1].pinned === e.pinned) min--;
+                while (max < entries.length - 1 && entries[max + 1].pinned === e.pinned) max++;
+                return { min: min, max: max };
+            } else {
+                // In "workspace" mode, only closed pinned apps (Group 2) can be dragged
+                let min = idx, max = idx;
+                while (min > 0 && entries[min - 1].pinned && entries[min - 1].tops.length === 0) min--;
+                while (max < entries.length - 1 && entries[max + 1].pinned && entries[max + 1].tops.length === 0) max++;
+                return { min: min, max: max };
+            }
+        }
+
+        function commitReorder(fromIdx, toIdx) {
+            if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= entries.length || toIdx >= entries.length) return;
+            const moved = entries[fromIdx];
+            if (!moved) return;
+
+            if (Config.o.dockOrder === "pinned") {
+                if (moved.pinned) {
+                    const pinned = Config.o.dockPinned.slice();
+                    if (fromIdx < pinned.length && toIdx < pinned.length) {
+                        const [item] = pinned.splice(fromIdx, 1);
+                        pinned.splice(toIdx, 0, item);
+                        Config.o.dockPinned = pinned;
+                    }
+                } else {
+                    const bounds = dragGroupBounds(fromIdx);
+                    const unpinnedKeys = entries.slice(bounds.min, bounds.max + 1).map(x => x.key);
+                    const localFrom = fromIdx - bounds.min;
+                    const localTo = toIdx - bounds.min;
+                    if (localFrom >= 0 && localFrom < unpinnedKeys.length && localTo >= 0 && localTo < unpinnedKeys.length) {
+                        const [k] = unpinnedKeys.splice(localFrom, 1);
+                        unpinnedKeys.splice(localTo, 0, k);
+                        const pinnedKeys = win.openOrder.filter(ok => !unpinnedKeys.includes(ok));
+                        win.openOrder = pinnedKeys.concat(unpinnedKeys);
+                    }
+                }
+            } else {
+                // "workspace" mode: reordering closed pinned apps
+                const bounds = dragGroupBounds(fromIdx);
+                const closedEntries = entries.slice(bounds.min, bounds.max + 1);
+                const localFrom = fromIdx - bounds.min;
+                const localTo = toIdx - bounds.min;
+                if (localFrom < 0 || localFrom >= closedEntries.length || localTo < 0 || localTo >= closedEntries.length) return;
+                const closedIds = closedEntries.map(x => x.id);
+                const [movedId] = closedIds.splice(localFrom, 1);
+                closedIds.splice(localTo, 0, movedId);
+
+                const closedKeySet = {};
+                for (const ce of closedEntries) closedKeySet[ce.key] = true;
+
+                const pinned = Config.o.dockPinned.slice();
+                let ci = 0;
+                for (let i = 0; i < pinned.length; i++) {
+                    const pk = canonId(pinned[i]);
+                    if (closedKeySet[pk] && ci < closedIds.length) {
+                        pinned[i] = closedIds[ci++];
+                    }
+                }
+                Config.o.dockPinned = pinned;
+            }
         }
         function togglePin(e) {
             const cur = Config.o.dockPinned.slice();
@@ -136,7 +256,10 @@ Variants {
             height: win.height - y
         }
 
-        Component.onCompleted: Panels.registry["dock"] = { holder: dock }
+        Component.onCompleted: {
+            Panels.registry["dock"] = { holder: dock };
+            win.syncOpenOrder();
+        }
 
         // Live window miniatures popup on hover
         Rectangle {
@@ -274,26 +397,40 @@ Variants {
                     delegate: Item {
                         id: item
                         required property var modelData
+                        required property int index
                         readonly property var entry: Apps.lookup(modelData.id)
                         readonly property int winCount: modelData.tops.length
                         readonly property bool running: winCount > 0
                         readonly property bool focused: running && modelData.tops.some(t => t.activated)
+                        readonly property bool isBeingDragged: win.dragFromIdx === index
+                        readonly property real stepW: width + row.spacing
+                        readonly property real shiftX: {
+                            if (win.dragFromIdx < 0 || isBeingDragged) return 0;
+                            if (win.dragFromIdx < win.dragTargetIdx && index > win.dragFromIdx && index <= win.dragTargetIdx) return -stepW;
+                            if (win.dragFromIdx > win.dragTargetIdx && index >= win.dragTargetIdx && index < win.dragFromIdx) return stepW;
+                            return 0;
+                        }
                         width: win.isz + 8; height: win.isz + 6
+                        z: isBeingDragged ? 10 : 1
+                        transform: Translate {
+                            x: item.isBeingDragged ? win.dragOffsetX : item.shiftX
+                            Behavior on x { enabled: !item.isBeingDragged; NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic } }
+                        }
 
                         Rectangle {
                             anchors.fill: parent; radius: Theme.radiusS + 4
-                            color: ma.containsMouse ? Theme.hover : "transparent"
+                            color: ma.containsMouse || item.isBeingDragged ? Theme.hover : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.animFast } }
                         }
                         Image {
                             id: icon
                             anchors.horizontalCenter: parent.horizontalCenter
-                            y: ma.containsMouse ? -4 : 0
+                            y: ma.containsMouse || item.isBeingDragged ? -4 : 0
                             width: win.isz; height: win.isz
                             sourceSize: Qt.size(win.isz * 2, win.isz * 2)
                             source: Apps.iconFor(entry?.icon ?? modelData.id)
                             smooth: true
-                            scale: ma.pressed ? 0.88 : (ma.containsMouse ? 1.15 : 1)
+                            scale: item.isBeingDragged ? 1.16 : (ma.pressed ? 0.88 : (ma.containsMouse ? 1.15 : 1))
                             Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
                             Behavior on y { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
                         }
@@ -341,8 +478,57 @@ Variants {
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                            cursorShape: Qt.PointingHandCursor
+                            cursorShape: item.isBeingDragged ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            property real pressMouseX: 0
+                            property bool dragMoved: false
+
+                            onPressed: m => {
+                                if (m.button === Qt.LeftButton) {
+                                    pressMouseX = m.x;
+                                    dragMoved = false;
+                                }
+                            }
+                            onPositionChanged: m => {
+                                if (!(m.buttons & Qt.LeftButton)) return;
+                                if (!win.canDragEntry(item.index)) return;
+                                const dx = m.x - pressMouseX + (item.isBeingDragged ? win.dragOffsetX : 0);
+                                if (!dragMoved && Math.abs(dx) > 6) {
+                                    dragMoved = true;
+                                    win.dragFromIdx = item.index;
+                                    win.dragTargetIdx = item.index;
+                                    win.hoverKey = "";
+                                    win.menuKey = "";
+                                }
+                                if (dragMoved && win.dragFromIdx === item.index) {
+                                    const bounds = win.dragGroupBounds(item.index);
+                                    const minDx = (bounds.min - item.index) * item.stepW;
+                                    const maxDx = (bounds.max - item.index) * item.stepW;
+                                    const clampedDx = Math.max(minDx, Math.min(maxDx, dx));
+                                    win.dragOffsetX = clampedDx;
+                                    const slotOffset = Math.round(clampedDx / item.stepW);
+                                    win.dragTargetIdx = Math.max(bounds.min, Math.min(bounds.max, item.index + slotOffset));
+                                }
+                            }
+                            onReleased: m => {
+                                if (dragMoved && win.dragFromIdx === item.index) {
+                                    const from = win.dragFromIdx;
+                                    const to = win.dragTargetIdx;
+                                    win.dragFromIdx = -1;
+                                    win.dragTargetIdx = -1;
+                                    win.dragOffsetX = 0;
+                                    win.commitReorder(from, to);
+                                }
+                            }
+                            onCanceled: {
+                                if (win.dragFromIdx === item.index) {
+                                    win.dragFromIdx = -1;
+                                    win.dragTargetIdx = -1;
+                                    win.dragOffsetX = 0;
+                                }
+                                dragMoved = false;
+                            }
                             onEntered: {
+                                if (win.isDragging) return;
                                 previewHideDelay.stop();
                                 win.hoverCenterX = dock.x + row.x + item.x + item.width / 2;
                                 win.hoverKey = item.modelData.key;
@@ -351,6 +537,7 @@ Variants {
                                 previewHideDelay.restart();
                             }
                             onClicked: m => {
+                                if (dragMoved) { dragMoved = false; return; }
                                 if (m.button === Qt.RightButton) { win.menuKey = win.menuKey === item.modelData.key ? "" : item.modelData.key; return; }
                                 win.menuKey = "";
                                 if (m.button === Qt.MiddleButton || !item.running) {
@@ -364,7 +551,7 @@ Variants {
                         }
                         // Simple tooltip only when app is not running (running apps show the live miniatures card)
                         Rectangle {
-                            visible: ma.containsMouse && !item.running && win.menuKey === ""
+                            visible: ma.containsMouse && !item.running && win.menuKey === "" && !win.isDragging
                             anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.top; bottomMargin: 8 }
                             width: tip.implicitWidth + 20; height: 26; radius: 8; color: Theme.card; border.width: 1; border.color: Theme.border
                             Label { id: tip; anchors.centerIn: parent; text: item.entry?.name ?? item.modelData.id; font.pixelSize: Theme.fsS + 1 }
