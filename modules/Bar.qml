@@ -457,13 +457,14 @@ Variants {
         // Expanded Media Player popup
         Rectangle {
             id: mediaPopup
+            readonly property int pagerOffset: Media.count > 1 ? 30 : 0
             visible: opacity > 0.01 && Media.player !== null
             opacity: win.mediaPopupOpen && Media.player !== null ? 1 : 0
             scale: win.mediaPopupOpen ? 1 : 0.94
             Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
             Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
             width: 340
-            height: 174
+            height: 174 + pagerOffset
             x: Math.min(win.width - width - 10, Math.max(10, bar.x + centerRow.x + mediaPill.x + mediaPill.width / 2 - width / 2))
             y: win.atTop ? (bar.y + bar.height + 6) : (bar.y - height - 6)
             radius: Theme.radiusL
@@ -473,9 +474,59 @@ Variants {
 
             MouseArea { anchors.fill: parent }
 
+            RowLayout {
+                visible: Media.count > 1
+                x: 14; y: 10; width: parent.width - 28; height: 24
+                spacing: 6
+                IconButton { glyph: "\uf053"; size: 22; iconSize: 10; onClicked: Media.prevPlayer() }
+                Row {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 6
+                    Repeater {
+                        model: Media.players
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            readonly property bool active: index === Media.currentIndex
+                            height: 22
+                            width: Math.min(115, mpRow.implicitWidth + 14)
+                            radius: 11
+                            color: active ? Theme.accent : (mpMa.containsMouse ? Theme.surface3 : Theme.surface2)
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                            Row {
+                                id: mpRow
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Icon {
+                                    text: modelData.isPlaying ? "\uf04b" : "\uf001"
+                                    font.pixelSize: 9
+                                    tint: active ? Theme.onAccent : Theme.subtext
+                                }
+                                Label {
+                                    width: Math.min(implicitWidth, 82)
+                                    text: Media.playerName(modelData)
+                                    font.pixelSize: Theme.fsS
+                                    font.weight: active ? Font.DemiBold : Font.Normal
+                                    color: active ? Theme.onAccent : Theme.text
+                                }
+                            }
+                            MouseArea {
+                                id: mpMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Media.selectIndex(index)
+                            }
+                        }
+                    }
+                }
+                IconButton { glyph: "\uf054"; size: 22; iconSize: 10; onClicked: Media.nextPlayer() }
+            }
+
             Rectangle {
                 id: mArt
-                x: 14; y: 14; width: 78; height: 78
+                x: 14; y: 14 + mediaPopup.pagerOffset; width: 78; height: 78
                 radius: Theme.radius
                 color: Theme.surface3
                 clip: true
@@ -496,7 +547,7 @@ Variants {
             }
 
             Column {
-                anchors { left: mArt.right; leftMargin: 14; right: parent.right; rightMargin: 14; top: parent.top; topMargin: 12 }
+                anchors { left: mArt.right; leftMargin: 14; right: parent.right; rightMargin: 14; top: mArt.top; topMargin: -2 }
                 spacing: 2
                 Label {
                     width: parent.width

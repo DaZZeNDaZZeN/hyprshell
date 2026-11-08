@@ -173,25 +173,112 @@ Variants {
                     // media
                     Card {
                         id: mediaCard
-                        Layout.fillWidth: true; Layout.preferredHeight: Media.player ? 96 : 0
+                        readonly property int pagerOffset: Media.count > 1 ? 30 : 0
+                        Layout.fillWidth: true; Layout.preferredHeight: Media.player ? (166 + pagerOffset) : 0
                         visible: Media.player !== null
+
+                        RowLayout {
+                            visible: Media.count > 1
+                            x: 12; y: 8; width: parent.width - 24; height: 24
+                            spacing: 6
+                            IconButton { glyph: "\uf053"; size: 22; iconSize: 10; onClicked: Media.prevPlayer() }
+                            Row {
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 6
+                                Repeater {
+                                    model: Media.players
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool active: index === Media.currentIndex
+                                        height: 22
+                                        width: Math.min(120, pRow.implicitWidth + 14)
+                                        radius: 11
+                                        color: active ? Theme.accent : (pMa.containsMouse ? Theme.surface3 : Theme.surface2)
+                                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                        Row {
+                                            id: pRow
+                                            anchors.centerIn: parent
+                                            spacing: 5
+                                            Icon {
+                                                text: modelData.isPlaying ? "\uf04b" : "\uf001"
+                                                font.pixelSize: 9
+                                                tint: active ? Theme.onAccent : Theme.subtext
+                                            }
+                                            Label {
+                                                width: Math.min(implicitWidth, 86)
+                                                text: Media.playerName(modelData)
+                                                font.pixelSize: Theme.fsS
+                                                font.weight: active ? Font.DemiBold : Font.Normal
+                                                color: active ? Theme.onAccent : Theme.text
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: pMa
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: Media.selectIndex(index)
+                                        }
+                                    }
+                                }
+                            }
+                            IconButton { glyph: "\uf054"; size: 22; iconSize: 10; onClicked: Media.nextPlayer() }
+                        }
+
                         Rectangle {
-                            id: art; x: 12; y: 12; width: 72; height: 72; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
+                            id: art; x: 12; y: 12 + mediaCard.pagerOffset; width: 72; height: 72; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
                             Image { anchors.fill: parent; source: Media.art; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(144, 144) }
                             Icon { anchors.centerIn: parent; text: "\uf001"; font.pixelSize: 24; tint: Theme.subtext; visible: !Media.art }
                         }
                         Column {
-                            anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: parent.top; topMargin: 14 }
+                            anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: art.top; topMargin: 2 }
                             spacing: 2
                             Label { width: parent.width; text: Media.title || "Nothing playing"; font.weight: Font.DemiBold }
-                            Label { width: parent.width; text: Media.artist; color: Theme.subtext; font.pixelSize: Theme.fsS + 1 }
+                            Label { width: parent.width; text: Media.artist || (Media.player?.identity ?? ""); color: Theme.subtext; font.pixelSize: Theme.fsS + 1 }
                         }
                         Row {
-                            anchors { left: art.right; leftMargin: 8; bottom: parent.bottom; bottomMargin: 10 }
+                            anchors { left: art.right; leftMargin: 8; bottom: art.bottom; bottomMargin: -2 }
                             spacing: 4
-                            IconButton { glyph: "\uf048"; size: 32; iconSize: 12; onClicked: Media.previous() }
-                            IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 32; iconSize: 13; active: true; onClicked: Media.playPause() }
-                            IconButton { glyph: "\uf051"; size: 32; iconSize: 12; onClicked: Media.next() }
+                            IconButton { glyph: "\uf048"; size: 30; iconSize: 11; onClicked: Media.previous() }
+                            IconButton { glyph: Media.playing ? "\uf04c" : "\uf04b"; size: 30; iconSize: 12; active: true; onClicked: Media.playPause() }
+                            IconButton { glyph: "\uf051"; size: 30; iconSize: 11; onClicked: Media.next() }
+                        }
+
+                        ColumnLayout {
+                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 12; bottomMargin: 10 }
+                            spacing: 6
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Label { text: Media.formatTime(Media.position); font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 32 }
+                                Slider {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 20
+                                    opacity: Media.length > 0 ? 1 : 0.45
+                                    value: Media.length > 0 ? Media.position / Media.length : 0
+                                    onMoved: v => Media.seekRatio(v)
+                                }
+                                Label { text: Media.formatTime(Media.length); font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                IconButton {
+                                    glyph: Audio.icon(Media.volume, Media.muted)
+                                    size: 24
+                                    iconSize: 12
+                                    onClicked: Media.toggleMute()
+                                }
+                                Slider {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 20
+                                    value: Media.muted ? 0 : Media.volume
+                                    onMoved: v => Media.setVolume(v)
+                                }
+                                Label { text: Math.round((Media.muted ? 0 : Media.volume) * 100) + "%"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
+                            }
                         }
                     }
                     // battery

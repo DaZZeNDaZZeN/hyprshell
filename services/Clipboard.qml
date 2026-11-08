@@ -12,6 +12,15 @@ Singleton {
     readonly property string store: Config.dir + "/clipboard.json"
     readonly property string watchScript: Qt.resolvedUrl("../scripts/clip-watch.sh").toString().replace("file://", "")
 
+    function decodeEscapedUnicode(s) {
+        if (!s || !/\\u[0-9a-fA-F]{4}/.test(s)) return s;
+        try {
+            return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+        } catch (e) {
+            return s;
+        }
+    }
+
     FileView {
         id: file
         path: root.store
@@ -28,7 +37,7 @@ Singleton {
                     return true;
                 }).map(e => ({
                     type: e.type || (e.image ? "image" : "text"),
-                    text: e.text || "",
+                    text: root.decodeEscapedUnicode(e.text || ""),
                     image: e.image || "",
                     pinned: !!e.pinned,
                     time: e.time || Date.now()
@@ -41,12 +50,12 @@ Singleton {
     Process {
         id: textWatcher
         running: true
-        command: ["wl-paste", "--type", "text/plain", "--watch", "bash", root.watchScript, "text"]
+        command: ["wl-paste", "--type", "text", "--watch", "bash", root.watchScript, "text"]
         stdout: SplitParser {
             onRead: line => {
                 let item = null;
                 try { item = JSON.parse(line); } catch (e) { return; }
-                if (item && item.text && item.text.trim()) root.add(item.text);
+                if (item && item.text && item.text.trim()) root.add(root.decodeEscapedUnicode(item.text));
             }
         }
     }

@@ -113,12 +113,63 @@ Variants {
             }
             // media
             Widget {
+                id: dwMedia
+                readonly property int pagerOffset: Media.count > 1 ? 28 : 0
                 visible: Config.o.widgetMedia && Media.player !== null
-                Layout.fillWidth: true; implicitHeight: 152
-                Rectangle { id: art; x: 12; y: 12; width: 68; height: 68; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
+                Layout.fillWidth: true; implicitHeight: 152 + pagerOffset
+                RowLayout {
+                    visible: Media.count > 1
+                    x: 12; y: 8; width: parent.width - 24; height: 22
+                    spacing: 4
+                    IconButton { glyph: "\uf053"; size: 20; iconSize: 9; onClicked: Media.prevPlayer() }
+                    Row {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 4
+                        Repeater {
+                            model: Media.players
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                readonly property bool active: index === Media.currentIndex
+                                height: 20
+                                width: Math.min(100, dwPRow.implicitWidth + 12)
+                                radius: 10
+                                color: active ? Theme.accent : (dwPMa.containsMouse ? Theme.surface3 : Theme.surface2)
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                Row {
+                                    id: dwPRow
+                                    anchors.centerIn: parent
+                                    spacing: 4
+                                    Icon {
+                                        text: modelData.isPlaying ? "\uf04b" : "\uf001"
+                                        font.pixelSize: 8
+                                        tint: active ? Theme.onAccent : Theme.subtext
+                                    }
+                                    Label {
+                                        width: Math.min(implicitWidth, 70)
+                                        text: Media.playerName(modelData)
+                                        font.pixelSize: Theme.fsS
+                                        font.weight: active ? Font.DemiBold : Font.Normal
+                                        color: active ? Theme.onAccent : Theme.text
+                                    }
+                                }
+                                MouseArea {
+                                    id: dwPMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: Media.selectIndex(index)
+                                }
+                            }
+                        }
+                    }
+                    IconButton { glyph: "\uf054"; size: 20; iconSize: 9; onClicked: Media.nextPlayer() }
+                }
+                Rectangle { id: art; x: 12; y: 12 + dwMedia.pagerOffset; width: 68; height: 68; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
                     Image { anchors.fill: parent; source: Media.art; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(136, 136) }
                     Icon { anchors.centerIn: parent; text: "\uf001"; tint: Theme.subtext; visible: !Media.art } }
-                Column { anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: parent.top; topMargin: 12 } spacing: 2
+                Column { anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: art.top } spacing: 2
                     Label { width: parent.width; text: Media.title || "Unknown track"; font.weight: Font.DemiBold }
                     Label { width: parent.width; text: Media.artist || (Media.player?.identity ?? ""); color: Theme.subtext; font.pixelSize: Theme.fsS + 1 } }
                 Row { anchors { left: art.right; leftMargin: 10; top: art.bottom; topMargin: -28 } spacing: 4
