@@ -22,6 +22,18 @@ Variants {
         readonly property real monH: modelData?.height || 1080
         readonly property real monX: mon?.x ?? 0
         readonly property real monY: mon?.y ?? 0
+        readonly property var winsByWs: {
+            if (!win.visible) return ({});
+            const map = {};
+            for (const t of Hyprland.toplevels.values) {
+                const id = t?.workspace?.id;
+                if (id) {
+                    if (!map[id]) map[id] = [];
+                    map[id].push(t);
+                }
+            }
+            return map;
+        }
 
         function go(i) {
             Panels.switchWorkspace(i + 1);
@@ -66,7 +78,7 @@ Variants {
                         required property int index
                         readonly property int wsId: index + 1
                         readonly property bool hot: win.sel === index
-                        readonly property var wins: Hyprland.toplevels.values.filter(t => t.workspace && t.workspace.id === wsId)
+                        readonly property var wins: win.winsByWs[wsId] ?? []
                         width: 236; height: 184
                         radius: Theme.radius
                         color: hot ? Theme.accentDim : Theme.surface2
@@ -108,11 +120,11 @@ Variants {
                             // Wallpaper miniature backdrop
                             Image {
                                 anchors.fill: parent
-                                source: win.open && Wallpaper.current ? "file://" + Wallpaper.current : ""
+                                source: win.visible && Wallpaper.current ? "file://" + Wallpaper.current : ""
                                 fillMode: Image.PreserveAspectCrop
                                 sourceSize: Qt.size(240, 135)
                                 asynchronous: true
-                                cache: true
+                                cache: false
                                 opacity: ws.wins.length > 0 ? 0.45 : 0.7
                             }
 

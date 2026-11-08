@@ -11,6 +11,15 @@ Item {
     property var screenObj
     readonly property var mon: Hyprland.monitorFor(screenObj)
     readonly property int activeId: mon?.activeWorkspace?.id ?? 1
+    readonly property var occupiedMap: {
+        const map = {};
+        for (const t of Hyprland.toplevels.values) {
+            if (t && t.workspace && typeof t.workspace.id === "number") {
+                map[t.workspace.id] = true;
+            }
+        }
+        return map;
+    }
     readonly property var wsList: {
         const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         const add = id => {
@@ -18,7 +27,7 @@ Item {
         };
         add(root.activeId);
         for (const w of Hyprland.workspaces.values) if (w) add(w.id);
-        for (const t of Hyprland.toplevels.values) if (t && t.workspace) add(t.workspace.id);
+        for (const k in root.occupiedMap) add( Number(k) );
         ids.sort((a, b) => a - b);
         return ids;
     }
@@ -44,7 +53,7 @@ Item {
                 required property var modelData
                 readonly property int wsId: modelData
                 readonly property bool active: root.activeId === wsId
-                readonly property bool occupied: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === wsId)
+                readonly property bool occupied: !!root.occupiedMap[wsId]
                 height: 22
                 width: active ? 34 : (wsId >= 10 ? 24 : 22)
                 radius: height / 2

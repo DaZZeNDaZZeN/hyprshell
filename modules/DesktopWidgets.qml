@@ -83,7 +83,7 @@ Variants {
                     anchors { bottom: parent.bottom; bottomMargin: 10; horizontalCenter: parent.horizontalCenter }
                     spacing: 18
                     Repeater {
-                        model: Weather.days
+                        model: Config.o.widgetWeather ? Weather.days : []
                         delegate: Row { required property var modelData; spacing: 5
                             Icon { text: Weather.icon(modelData.code); font.pixelSize: 11; tint: Theme.subtext }
                             Label { text: Qt.formatDate(new Date(modelData.date), "ddd") + " " + Weather.t(modelData.max) + "°"; font.pixelSize: Theme.fsS; color: Theme.subtext } }
@@ -97,11 +97,11 @@ Variants {
                 Column {
                     x: 18; y: 14; width: parent.width - 36; spacing: 10
                     Repeater {
-                        model: [
+                        model: Config.o.widgetSystem ? [
                             { n: "CPU", v: SysInfo.cpu, t: Math.round(SysInfo.cpu * 100) + "%" },
                             { n: "RAM", v: SysInfo.mem, t: SysInfo.memUsedGb.toFixed(1) + " / " + SysInfo.memTotalGb.toFixed(1) + " GB" },
                             { n: "Disk", v: SysInfo.disk, t: Math.round(SysInfo.disk * 100) + "%" },
-                        ]
+                        ] : []
                         delegate: Item { required property var modelData; width: parent.width; height: 26
                             Label { text: modelData.n; width: 40; font.pixelSize: Theme.fsS + 1; color: Theme.subtext }
                             Rectangle { x: 46; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 46 - 100; height: 8; radius: 4; color: Theme.surface3
@@ -127,7 +127,7 @@ Variants {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 4
                         Repeater {
-                            model: Media.players
+                            model: dwMedia.visible ? Media.players : []
                             delegate: Rectangle {
                                 required property var modelData
                                 required property int index
@@ -167,7 +167,7 @@ Variants {
                     IconButton { glyph: "\uf054"; size: 20; iconSize: 9; onClicked: Media.nextPlayer() }
                 }
                 Rectangle { id: art; x: 12; y: 12 + dwMedia.pagerOffset; width: 68; height: 68; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
-                    Image { anchors.fill: parent; source: Media.art; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(136, 136) }
+                    Image { anchors.fill: parent; source: dwMedia.visible ? Media.art : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(136, 136) }
                     Icon { anchors.centerIn: parent; text: "\uf001"; tint: Theme.subtext; visible: !Media.art } }
                 Column { anchors { left: art.right; leftMargin: 12; right: parent.right; rightMargin: 12; top: art.top } spacing: 2
                     Label { width: parent.width; text: Media.title || "Unknown track"; font.weight: Font.DemiBold }
@@ -182,15 +182,15 @@ Variants {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
-                        Label { text: Media.formatTime(Media.position); font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 30 }
+                        Label { text: dwMedia.visible ? Media.formatTime(Media.position) : "0:00"; font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 30 }
                         Slider {
                             Layout.fillWidth: true
                             implicitHeight: 18
                             opacity: Media.length > 0 ? 1 : 0.45
-                            value: Media.length > 0 ? Media.position / Media.length : 0
+                            value: dwMedia.visible && Media.length > 0 ? Media.position / Media.length : 0
                             onMoved: v => Media.seekRatio(v)
                         }
-                        Label { text: Media.formatTime(Media.length); font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 30 }
+                        Label { text: dwMedia.visible ? Media.formatTime(Media.length) : "0:00"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 30 }
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -218,7 +218,7 @@ Variants {
                 Row {
                     anchors.centerIn: parent; spacing: 10
                     Repeater {
-                        model: Config.o.appLinks
+                        model: Config.o.widgetLinks ? Config.o.appLinks : []
                         delegate: Rectangle {
                             required property var modelData
                             readonly property var entry: Apps.lookup(modelData)

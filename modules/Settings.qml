@@ -146,11 +146,12 @@ Variants {
 
                 // ================= Wallpaper =================
                 Page {
+                    id: wallpaperPage
                     key: "wallpaper"
                     Section { text: "Current" }
                     Rectangle {
                         Layout.fillWidth: true; Layout.preferredHeight: 180; radius: Theme.radius; color: Theme.surface2; clip: true
-                        Image { anchors.fill: parent; source: Wallpaper.current ? "file://" + Wallpaper.current : ""; fillMode: Image.PreserveAspectCrop; sourceSize: Qt.size(900, 360); asynchronous: true }
+                        Image { anchors.fill: parent; source: win.visible && wallpaperPage.visible && Wallpaper.current ? "file://" + Wallpaper.current : ""; fillMode: Image.PreserveAspectCrop; sourceSize: Qt.size(900, 360); asynchronous: true; cache: false }
                         Rectangle { anchors { left: parent.left; bottom: parent.bottom; margins: 10 } height: 28; width: ct.implicitWidth + 20; radius: 14; color: "#aa000000"
                             Label { id: ct; anchors.centerIn: parent; color: "white"; text: Wallpaper.current.split("/").pop(); font.pixelSize: Theme.fsS } }
                     }
@@ -171,14 +172,14 @@ Variants {
                     Flow {
                         Layout.fillWidth: true; spacing: 10
                         Repeater {
-                            model: Wallpaper.files
+                            model: win.visible && wallpaperPage.visible ? Wallpaper.files : []
                             delegate: Rectangle {
                                 required property var modelData
                                 readonly property bool cur: modelData === Wallpaper.current
                                 width: 150; height: 92; radius: Theme.radiusS + 2; color: Theme.surface2; clip: true
                                 border.width: cur ? 3 : 0; border.color: Theme.accent
                                 scale: wm.containsMouse ? 1.04 : 1; Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-                                Image { anchors.fill: parent; source: "file://" + modelData; fillMode: Image.PreserveAspectCrop; sourceSize: Qt.size(300, 184); asynchronous: true }
+                                Image { anchors.fill: parent; source: "file://" + modelData; fillMode: Image.PreserveAspectCrop; sourceSize: Qt.size(300, 184); asynchronous: true; cache: false }
                                 MouseArea { id: wm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Wallpaper.apply(modelData) }
                             }
                         }
@@ -246,7 +247,7 @@ Variants {
                     }
                     Section { text: "Pinned apps (drag or use arrows to reorder)" }
                     Repeater {
-                        model: win.o.dockPinned
+                        model: win.visible && dockPage.visible ? win.o.dockPinned : []
                         delegate: Rectangle {
                             id: pinRow
                             required property var modelData
@@ -375,6 +376,7 @@ Variants {
 
                 // ================= Widgets =================
                 Page {
+                    id: widgetsPage
                     key: "widgets"
                     Section { text: "Desktop widgets" }
                     SettingRow { title: "Enable widgets"; Sw { checked: win.o.widgetsEnabled; onToggled: v => win.o.widgetsEnabled = v } }
@@ -392,7 +394,7 @@ Variants {
                     SettingRow { title: "Fahrenheit"; Sw { checked: win.o.weatherFahrenheit; onToggled: v => win.o.weatherFahrenheit = v } }
                     Section { text: "App links" }
                     Repeater {
-                        model: win.o.appLinks
+                        model: win.visible && widgetsPage.visible ? win.o.appLinks : []
                         delegate: SettingRow {
                             required property var modelData
                             title: Apps.lookup(modelData)?.name ?? modelData; desc: modelData
@@ -428,10 +430,11 @@ Variants {
 
                 // ================= Keybindings =================
                 Page {
+                    id: keysPage
                     key: "keys"
                     Section { text: "Session & windows" }
                     Repeater {
-                        model: [
+                        model: win.visible && keysPage.visible ? [
                             ["Super + M", "Exit Hyprland"], ["Super + C", "Close window"], ["Super + B", "Float / tile"], ["Super + F", "Fullscreen"],
                             ["Super + G", "Maximize"], ["Super + ← ↑ → ↓", "Move focus"], ["Super + T / Ctrl+Alt+T", "Terminal"], ["Super + W", "Browser"],
                             ["Alt + Tab / Shift", "Next / previous workspace"], ["Alt + Ctrl + Tab / Shift", "Move window to next / previous"],
@@ -440,7 +443,7 @@ Variants {
                             ["Alt + ` / Super + Tab", "Workspace switcher"], ["Super + Shift + S", "Screenshot"], ["Super + V", "Clipboard history"],
                             ["Super + I", "Settings"], ["Super + L", "Lock screen"], ["Super + Shift + W", "Wallpaper browser"], ["Super + Shift + R", "Toggle screen recording"],
                             ["Mouse4", "Toggle microphone mute"],
-                        ]
+                        ] : []
                         delegate: SettingRow { required property var modelData; title: modelData[1]
                             Rectangle { height: 28; width: kl.implicitWidth + 20; radius: 8; color: Theme.surface3
                                 Label { id: kl; anchors.centerIn: parent; text: modelData[0]; font.family: "monospace"; font.pixelSize: Theme.fsS + 1 } } }

@@ -4,18 +4,17 @@ import colorsys, subprocess, sys
 
 path = sys.argv[1]
 try:
-    out = subprocess.run(["magick", path + "[0]", "-resize", "96x96", "-depth", "8", "txt:-"],
-                         capture_output=True, text=True, timeout=20).stdout
+    raw = subprocess.run(["magick", path + "[0]", "-resize", "64x64", "-depth", "8", "rgb:-"],
+                         capture_output=True, timeout=15).stdout
 except Exception:
     print("#7aa2f7"); sys.exit(0)
 
 buckets = {}
-for line in out.splitlines()[1:]:
-    try:
-        h = line.split("#")[1][:6]
-        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    except Exception:
-        continue
+inv255 = 1.0 / 255.0
+for i in range(0, len(raw) - 2, 3):
+    r = raw[i] * inv255
+    g = raw[i + 1] * inv255
+    b = raw[i + 2] * inv255
     hh, ss, vv = colorsys.rgb_to_hsv(r, g, b)
     if vv < 0.25 or ss < 0.18:      # skip near-black / grey pixels
         continue

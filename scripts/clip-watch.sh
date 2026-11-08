@@ -38,10 +38,7 @@ if [ "$mode" = "text" ]; then
         exit 0
     fi
     # Ignore binary PNG headers or browser <img> HTML wrappers when copying an image
-    if printf '%s' "$txt" | head -c 8 | grep -q $'\x89PNG'; then
-        exit 0
-    fi
-    if printf '%s' "$txt" | grep -qE '^<meta http-equiv="content-type".*<img '; then
+    if [[ "$txt" == $'\x89PNG'* ]] || [[ "$txt" =~ ^\<meta\ http-equiv=\"content-type\".*\<img\  ]]; then
         exit 0
     fi
     jq -nc --arg txt "$txt" '{type: "text", image: "", text: $txt}'

@@ -35,12 +35,14 @@ Variants {
         }
 
         component Pic: Image {
+            id: pic
             anchors.fill: parent
             asynchronous: true
             cache: false
             fillMode: win.fill
-            sourceSize: Qt.size(win.width, win.height)
+            sourceSize: Qt.size(Math.max(1, win.width), Math.max(1, win.height))
             onStatusChanged: win.ready(this)
+            onOpacityChanged: if (opacity === 0 && win.pending !== pic && source != "") source = ""
         }
         Pic { id: a; source: win.src; opacity: win.showA ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.animSlow * 2; easing.type: Easing.InOutCubic } } }
         Pic { id: b; opacity: win.showA ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.animSlow * 2; easing.type: Easing.InOutCubic } } }

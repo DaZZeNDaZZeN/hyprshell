@@ -22,8 +22,8 @@ Variants {
         readonly property int gap: Config.o.barFloating ? 6 : 0
         readonly property bool autoHide: Config.o.barAutoHide
         readonly property int activeWsId: Hyprland.monitorFor(win.screen)?.activeWorkspace?.id ?? 1
-        readonly property bool wsEmpty: ToplevelManager.toplevels.values.length === 0
-            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId)
+        readonly property bool wsEmpty: (autoHide && Config.o.barKeepOnEmpty) && (ToplevelManager.toplevels.values.length === 0
+            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId))
         property bool pointerInside: false
         property bool kbMenuOpen: false
         property bool calendarOpen: false
@@ -45,6 +45,9 @@ Variants {
 
         property int calYear: new Date().getFullYear()
         property int calMonth: new Date().getMonth()
+        readonly property int todayYear: clock.date.getFullYear()
+        readonly property int todayMonth: clock.date.getMonth()
+        readonly property int todayDay: clock.date.getDate()
 
         function calendarDays(year, month) {
             const first = new Date(year, month, 1);
@@ -52,8 +55,7 @@ Variants {
             const startDow = (first.getDay() + 6) % 7;
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const daysInPrev = new Date(year, month, 0).getDate();
-            const today = clock.date;
-            const tY = today.getFullYear(), tM = today.getMonth(), tD = today.getDate();
+            const tY = win.todayYear, tM = win.todayMonth, tD = win.todayDay;
             const cells = [];
             for (let i = 0; i < 42; i++) {
                 const offset = i - startDow + 1;
@@ -484,7 +486,7 @@ Variants {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 6
                     Repeater {
-                        model: Media.players
+                        model: mediaPopup.visible ? Media.players : []
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
@@ -532,7 +534,7 @@ Variants {
                 clip: true
                 Image {
                     anchors.fill: parent
-                    source: Media.art
+                    source: mediaPopup.visible ? Media.art : ""
                     fillMode: Image.PreserveAspectCrop
                     visible: status === Image.Ready
                     sourceSize: Qt.size(168, 168)
@@ -580,7 +582,7 @@ Variants {
                     Layout.fillWidth: true
                     spacing: 8
                     Label {
-                        text: Media.formatTime(Media.position)
+                        text: mediaPopup.visible ? Media.formatTime(Media.position) : "0:00"
                         font.pixelSize: Theme.fsS
                         color: Theme.subtext
                         Layout.preferredWidth: 32
@@ -589,11 +591,11 @@ Variants {
                         Layout.fillWidth: true
                         implicitHeight: 20
                         opacity: Media.length > 0 ? 1 : 0.45
-                        value: Media.length > 0 ? Media.position / Media.length : 0
+                        value: mediaPopup.visible && Media.length > 0 ? Media.position / Media.length : 0
                         onMoved: v => Media.seekRatio(v)
                     }
                     Label {
-                        text: Media.formatTime(Media.length)
+                        text: mediaPopup.visible ? Media.formatTime(Media.length) : "0:00"
                         font.pixelSize: Theme.fsS
                         color: Theme.subtext
                         horizontalAlignment: Text.AlignRight
@@ -700,7 +702,7 @@ Variants {
                     width: parent.width
                     columns: 7
                     Repeater {
-                        model: win.calendarDays(win.calYear, win.calMonth)
+                        model: calPopup.visible ? win.calendarDays(win.calYear, win.calMonth) : []
                         delegate: Rectangle {
                             required property var modelData
                             width: calGrid.width / 7
@@ -743,7 +745,7 @@ Variants {
                 anchors { fill: parent; margins: 6 }
                 spacing: 2
                 Repeater {
-                    model: Keyboard.layouts
+                    model: kbMenu.visible ? Keyboard.layouts : []
                     delegate: Rectangle {
                         required property var modelData
                         readonly property bool active: modelData.index === Keyboard.activeIndex

@@ -97,18 +97,20 @@ Singleton {
     }
 
     // Push the palette into GTK / Qt / KDE / Hyprland whenever it changes.
-    property string sig: hex(accent) + hex(bg) + hex(surface) + hex(text) + dark + Config.o.iconTheme + Config.o.cursorTheme + Config.o.cursorSize
-    onSigChanged: applyTimer.restart()
+    property string _lastAppliedSig: ""
+    readonly property string sig: hex(accent) + hex(bg) + hex(surface) + hex(text) + dark + Config.o.iconTheme + Config.o.cursorTheme + Config.o.cursorSize + Config.o.syncToolkits
+    onSigChanged: if (Config.loaded && sig !== _lastAppliedSig) applyTimer.restart()
     Timer {
         id: applyTimer
-        interval: 700
+        interval: 500
         onTriggered: {
-            if (!Config.loaded) return;
+            if (!Config.loaded || root.sig === root._lastAppliedSig) return;
+            root._lastAppliedSig = root.sig;
             Quickshell.execDetached(["python3", Quickshell.shellDir + "/scripts/apply-theme.py",
                 root.dark ? "dark" : "light", root.hex(root.accent), root.hex(root.bg), root.hex(root.surface),
                 root.hex(root.text), Config.o.iconTheme, Config.o.cursorTheme, String(Config.o.cursorSize),
                 Config.o.syncToolkits ? "1" : "0"]);
         }
     }
-    Connections { target: Config; function onLoadedChanged() { applyTimer.restart(); } }
+    Connections { target: Config; function onLoadedChanged() { if (Config.loaded) applyTimer.restart(); } }
 }

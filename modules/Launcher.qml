@@ -71,25 +71,23 @@ Variants {
             }
         }
 
-        function actions() {
-            return [
-                { title: "Lock screen", sub: "Session", glyph: "\uf023", run: () => Actions.lock() },
-                { title: "Log out", sub: "Session", glyph: "\uf2f5", run: () => Actions.logout() },
-                { title: "Suspend", sub: "Session", glyph: "\uf186", run: () => Actions.suspend() },
-                { title: "Reboot", sub: "Session", glyph: "\uf021", run: () => Actions.reboot() },
-                { title: "Power off", sub: "Session", glyph: "\uf011", run: () => Actions.poweroff() },
-                { title: "Settings", sub: "Shell", glyph: "\uf013", run: () => Panels.open("settings") },
-                { title: "Wallpaper browser", sub: "Shell", glyph: "\uf03e", run: () => Panels.open("wallhaven") },
-                { title: "Clipboard history", sub: "Shell", glyph: "\uf328", run: () => Panels.open("clipboard") },
-                { title: "Control center", sub: "Shell", glyph: "\uf1de", run: () => Panels.open("controlcenter") },
-                { title: "Notifications", sub: "Shell", glyph: "\uf0f3", run: () => Panels.open("notifications") },
-                { title: "Screenshot region", sub: "Utility", glyph: "\uf030", run: () => Screenshot.start("region") },
-                { title: "Screenshot screen", sub: "Utility", glyph: "\uf108", run: () => Screenshot.start("screen") },
-                { title: "Toggle screen recording", sub: "Utility", glyph: "\uf03d", run: () => Recorder.toggle() },
-                { title: "Toggle dark / light", sub: "Appearance", glyph: "\uf186", run: () => { Config.o.themeMode = Theme.dark ? "light" : "dark"; } },
-                { title: "Random wallpaper", sub: "Appearance", glyph: "\uf074", run: () => Wallpaper.random() },
-            ];
-        }
+        readonly property var actionList: [
+            { title: "Lock screen", sub: "Session", glyph: "\uf023", run: () => Actions.lock() },
+            { title: "Log out", sub: "Session", glyph: "\uf2f5", run: () => Actions.logout() },
+            { title: "Suspend", sub: "Session", glyph: "\uf186", run: () => Actions.suspend() },
+            { title: "Reboot", sub: "Session", glyph: "\uf021", run: () => Actions.reboot() },
+            { title: "Power off", sub: "Session", glyph: "\uf011", run: () => Actions.poweroff() },
+            { title: "Settings", sub: "Shell", glyph: "\uf013", run: () => Panels.open("settings") },
+            { title: "Wallpaper browser", sub: "Shell", glyph: "\uf03e", run: () => Panels.open("wallhaven") },
+            { title: "Clipboard history", sub: "Shell", glyph: "\uf328", run: () => Panels.open("clipboard") },
+            { title: "Control center", sub: "Shell", glyph: "\uf1de", run: () => Panels.open("controlcenter") },
+            { title: "Notifications", sub: "Shell", glyph: "\uf0f3", run: () => Panels.open("notifications") },
+            { title: "Screenshot region", sub: "Utility", glyph: "\uf030", run: () => Screenshot.start("region") },
+            { title: "Screenshot screen", sub: "Utility", glyph: "\uf108", run: () => Screenshot.start("screen") },
+            { title: "Toggle screen recording", sub: "Utility", glyph: "\uf03d", run: () => Recorder.toggle() },
+            { title: "Toggle dark / light", sub: "Appearance", glyph: "\uf186", run: () => { Config.o.themeMode = Theme.dark ? "light" : "dark"; } },
+            { title: "Random wallpaper", sub: "Appearance", glyph: "\uf074", run: () => Wallpaper.random() },
+        ]
         function score(name, q) {
             name = name.toLowerCase();
             if (name === q) return 120;
@@ -157,7 +155,7 @@ Variants {
                 const s = Math.max(score(t.title, lq), score(t.appId, lq)) * 0.8;
                 if (s > 0) out.push({ title: t.title, sub: "Open window · " + t.appId, icon: Apps.iconFor(Apps.lookup(t.appId)?.icon ?? t.appId), score: s + 5, run: () => t.activate() });
             }
-            for (const a of actions()) { const s = score(a.title, lq); if (s > 0) out.push(Object.assign({ score: s - 5 }, a)); }
+            for (const a of actionList) { const s = score(a.title, lq); if (s > 0) out.push(Object.assign({ score: s - 5 }, a)); }
             out.sort((x, y) => y.score - x.score);
             const top = out.slice(0, 40);
             top.push({ title: "Search the web for “" + q + "”", sub: "Web", glyph: "\uf002", run: () => Quickshell.execDetached(["xdg-open", Config.o.webSearchUrl + encodeURIComponent(q)]) });
@@ -201,6 +199,7 @@ Variants {
             initMouseY = -1;
             Qt.callLater(() => { calcExpr = ""; calcResult = ""; calcFull = ""; pendingCalcExpr = ""; input.text = ""; update(); input.forceActiveFocus(); });
         }
+        onVisibleChanged: if (!visible) { results = []; qalcTimer.stop(); pendingCalcExpr = ""; }
 
         PopupCard {
             id: card

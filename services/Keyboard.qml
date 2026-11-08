@@ -93,11 +93,13 @@ Singleton {
     Process {
         id: kbProc
         running: true
-        command: ["sh", "-c", "hyprctl devices -j | jq -c '[.keyboards[] | select(.main)][0] // .keyboards[0]'"]
+        command: ["hyprctl", "devices", "-j"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    const kb = JSON.parse(text.trim());
+                    const data = JSON.parse(text);
+                    const kbs = data?.keyboards ?? [];
+                    const kb = kbs.find(k => k.main) || kbs[0];
                     if (!kb) return;
                     const codes = (kb.layout || "us").split(",").map(s => s.trim()).filter(Boolean);
                     const idx = kb.active_layout_index ?? 0;
@@ -125,8 +127,16 @@ Singleton {
             root.layout = name;
             const code = root.codeForName(name);
             const matchIdx = root.layouts.findIndex(l => l.code === code || l.name.toLowerCase() === name.toLowerCase());
-            if (matchIdx >= 0) root.activeIndex = matchIdx;
-            root.refresh();
+            if (matchIdx >= 0) {
+                root.activeIndex = matchIdx;
+                if (root.layouts[matchIdx].name !== name) {
+                    const updated = root.layouts.slice();
+                    updated[matchIdx] = { index: matchIdx, code: updated[matchIdx].code, name: name };
+                    root.layouts = updated;
+                }
+            } else {
+                root.refresh();
+            }
             if (changed) Osd.show("layout", "\uf11c", code || root.short, -1, name);
         }
     }
@@ -186,14 +196,18 @@ Singleton {
         }
     }
 
+    readonly property bool pollLockKeys: (Config.o.osdEnabled && Config.o.osdLockKeys) || Panels.locked
+
     Timer {
-        interval: 300
+        interval: 400
         repeat: true
-        running: root.capsPath !== "" || root.numPath !== "" || root.scrollPath !== ""
+        running: root.pollLockKeys && (root.capsPath !== "" || root.numPath !== "" || root.scrollPath !== "")
         onTriggered: {
             if (root.capsPath) capsFile.reload();
-            if (root.numPath) numFile.reload();
-            if (root.scrollPath) scrollFile.reload();
+            if (Config.o.osdEnabled && Config.o.osdLockKeys) {
+                if (root.numPath) numFile.reload();
+                if (root.scrollPath) scrollFile.reload();
+            }
         }
     }
 }

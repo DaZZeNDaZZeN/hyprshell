@@ -54,6 +54,7 @@ Singleton {
             }
         }
     }
-    Timer { interval: 1800000; repeat: true; running: root.users > 0; triggeredOnStart: true; onTriggered: root.refresh() }
-    Connections { target: Config.o; function onWeatherCityChanged() { if (root.users > 0) root.refresh(); } }
+    readonly property bool active: root.users > 0 && Config.o.widgetsEnabled && Config.o.widgetWeather
+    Timer { interval: 1800000; repeat: true; running: root.active; triggeredOnStart: true; onTriggered: root.refresh() }
+    Connections { target: Config.o; function onWeatherCityChanged() { if (root.active) root.refresh(); } }
 }

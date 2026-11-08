@@ -32,6 +32,8 @@ Singleton {
     FileView {
         id: curFile
         path: root.device ? "/sys/class/backlight/" + root.device + "/brightness" : ""
+        watchChanges: true
+        onFileChanged: reload()
         onLoaded: {
             const v = parseInt(text());
             if (isNaN(v)) return;
@@ -46,7 +48,12 @@ Singleton {
             }
         }
     }
-    Timer { interval: 1500; running: root.available; repeat: true; onTriggered: curFile.reload() }
+    Timer {
+        interval: 3000
+        running: root.available && ((Config.o.osdEnabled && Config.o.osdBrightness) || Panels.active === "controlcenter")
+        repeat: true
+        onTriggered: curFile.reload()
+    }
 
     Process { id: setter }
     function set(v) {

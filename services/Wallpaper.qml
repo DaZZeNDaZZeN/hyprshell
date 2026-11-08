@@ -65,6 +65,13 @@ Singleton {
         repeat: true
         onTriggered: root.random()
     }
-    Component.onCompleted: refresh()
-    Connections { target: Config; function onLoadedChanged() { root.refresh(); if (Config.o.wallpaper) root.extract(Config.o.wallpaper); } }
+    Component.onCompleted: if (Config.loaded) refresh()
+    Connections {
+        target: Config
+        function onLoadedChanged() {
+            if (!Config.loaded) return;
+            root.refresh();
+            if (Config.o.wallpaper && !Config.o.wallpaperAccent) root.extract(Config.o.wallpaper);
+        }
+    }
 }

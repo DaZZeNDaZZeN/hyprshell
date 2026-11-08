@@ -21,8 +21,8 @@ Variants {
         readonly property int dockH: isz + pad * 2 + 6
         readonly property bool autoHide: Config.o.dockAutoHide
         readonly property int activeWsId: Hyprland.monitorFor(win.screen)?.activeWorkspace?.id ?? 1
-        readonly property bool wsEmpty: ToplevelManager.toplevels.values.length === 0
-            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId)
+        readonly property bool wsEmpty: (autoHide && Config.o.dockKeepOnEmpty) && (ToplevelManager.toplevels.values.length === 0
+            || !Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === win.activeWsId))
         property bool pointerInside: false
         property string menuKey: ""
         property string hoverKey: ""
@@ -571,11 +571,11 @@ Variants {
                                 id: mcol
                                 anchors { fill: parent; margins: 6 }
                                 Repeater {
-                                    model: [
+                                    model: menu.visible ? [
                                         { t: "Open new window", g: "\uf067", a: "new" },
                                         { t: item.modelData.pinned ? "Unpin from dock" : "Pin to dock", g: "\uf08d", a: "pin" },
                                         { t: "Close window" + (item.modelData.tops.length > 1 ? "s" : ""), g: "\uf00d", a: "close", off: !item.running },
-                                    ].filter(x => !x.off)
+                                    ].filter(x => !x.off) : []
                                     delegate: Rectangle {
                                         required property var modelData
                                         width: mcol.width; height: 32; radius: Theme.radiusS

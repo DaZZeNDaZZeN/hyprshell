@@ -20,6 +20,7 @@ Variants {
             if (open) { if (Wallhaven.results.length === 0) Wallhaven.search(); search.forceActiveFocus(); }
             else preview = null;
         }
+        onVisibleChanged: if (!visible) pv.pvLast = null
 
         component Pill: Chip { Layout.alignment: Qt.AlignVCenter }
 
@@ -78,7 +79,7 @@ Variants {
                     clip: true
                     readonly property int cols: Math.max(2, Math.floor(width / 250))
                     cellWidth: Math.floor(width / cols); cellHeight: Math.round(cellWidth * 0.62)
-                    model: Wallhaven.model
+                    model: win.visible ? Wallhaven.model : null
                     boundsBehavior: Flickable.StopAtBounds
                     onAtYEndChanged: if (atYEnd && count > 0) Wallhaven.more()
                     delegate: Item {
@@ -97,7 +98,7 @@ Variants {
                                 id: th
                                 anchors.fill: parent
                                 source: cell.itemData.thumbs.large
-                                fillMode: Image.PreserveAspectCrop; asynchronous: true
+                                fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false
                                 sourceSize: Qt.size(400, 260)
                                 opacity: status === Image.Ready ? 1 : 0
                                 Behavior on opacity { NumberAnimation { duration: Theme.anim } }
@@ -150,8 +151,8 @@ Variants {
                     Behavior on scale { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
                     Image {
                         anchors.fill: parent
-                        source: pv.item ? pv.item.thumbs.original : ""
-                        fillMode: Image.PreserveAspectFit; asynchronous: true
+                        source: pv.visible && pv.item ? pv.item.thumbs.original : ""
+                        fillMode: Image.PreserveAspectFit; asynchronous: true; cache: false
                     }
                     MouseArea { anchors.fill: parent }
                 }

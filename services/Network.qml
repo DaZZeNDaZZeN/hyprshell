@@ -12,6 +12,7 @@ Singleton {
     property var networks: []           // {ssid, signal, secure, active}
     property string activeSsid: ""
     property int activeSignal: 0
+    property string wifiDevice: ""
     property bool ethernetUp: false
     property string ethernetName: ""
     property bool scanning: false
@@ -39,7 +40,12 @@ Singleton {
         if (password) c.push("password", password);
         connector.command = c; connector.running = true;
     }
-    function disconnectActive() { runner.command = ["sh", "-c", "nmcli -t -f DEVICE,TYPE dev | grep ':wifi' | cut -d: -f1 | xargs -r nmcli dev disconnect"]; runner.running = true; }
+    function disconnectActive() {
+        if (root.wifiDevice) {
+            runner.command = ["nmcli", "dev", "disconnect", root.wifiDevice];
+            runner.running = true;
+        }
+    }
 
     Process { id: runner; onExited: refreshTimer.restart() }
     Process {
@@ -57,12 +63,16 @@ Singleton {
         command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "dev"]
         stdout: StdioCollector {
             onStreamFinished: {
-                let eth = false, name = "", wifiSsid = "";
+                let eth = false, name = "", wifiSsid = "", wifiDev = "";
                 for (const l of text.trim().split("\n")) {
                     const p = l.split(":");
                     if (p[1] === "ethernet" && p[2] === "connected") { eth = true; name = p[3] || ""; }
-                    else if (p[1] === "wifi" && p[2] === "connected") { wifiSsid = p[3] || ""; }
+                    else if (p[1] === "wifi") {
+                        if (!wifiDev) wifiDev = p[0] || "";
+                        if (p[2] === "connected") wifiSsid = p[3] || "";
+                    }
                 }
+                root.wifiDevice = wifiDev;
                 root.ethernetUp = eth; root.ethernetName = name;
                 if (!root.wanted) root.activeSsid = wifiSsid;
             }
@@ -92,6 +102,17 @@ Singleton {
         }
         onExited: root.scanning = false
     }
-    Timer { id: refreshTimer; interval: 1200; onTriggered: root.refresh() }
-    Timer { interval: 15000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.refresh() }
+    Process {
+        id: monitor
+        running: true
+        command: ["nmcli", "monitor"]
+        stdout: SplitParser {
+            onRead: line => {
+                if (line && !line.includes("Networkmanager is now")) refreshTimer.restart();
+            }
+        }
+    }
+    Component.onCompleted: refresh()
+    Timer { id: refreshTimer; interval: 400; onTriggered: root.refresh() }
+    Timer { interval: 15000; running: root.wanted; repeat: true; onTriggered: root.refresh() }
 }

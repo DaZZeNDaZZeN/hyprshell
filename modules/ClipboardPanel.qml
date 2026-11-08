@@ -16,6 +16,7 @@ Variants {
         name: "clipboard"
         property int sel: 0
         readonly property var shownEntries: {
+            if (!win.visible) return [];
             const q = search.text.trim().toLowerCase();
             return Clipboard.entries.filter(e => !q || (e.text && e.text.toLowerCase().includes(q)) || (e.image && e.image.toLowerCase().includes(q)));
         }
@@ -82,6 +83,7 @@ Variants {
                                     fillMode: Image.PreserveAspectFit
                                     sourceSize: Qt.size(296, 188)
                                     asynchronous: true
+                                    cache: false
                                 }
                             }
                             Column {

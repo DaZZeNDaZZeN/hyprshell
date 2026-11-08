@@ -81,7 +81,14 @@ Singleton {
         }
     }
 
+    property bool _dirtyMonitors: false
+    property bool _dirtyWorkspaces: false
+    property bool _dirtyToplevels: false
+
     function refreshHypr() {
+        _dirtyMonitors = false;
+        _dirtyWorkspaces = false;
+        _dirtyToplevels = false;
         Hyprland.refreshMonitors();
         Hyprland.refreshWorkspaces();
         Hyprland.refreshToplevels();
@@ -92,17 +99,30 @@ Singleton {
     Timer {
         id: refreshTimer
         interval: 80
-        onTriggered: root.refreshHypr()
+        onTriggered: {
+            if (root._dirtyMonitors) { root._dirtyMonitors = false; Hyprland.refreshMonitors(); }
+            if (root._dirtyWorkspaces) { root._dirtyWorkspaces = false; Hyprland.refreshWorkspaces(); }
+            if (root._dirtyToplevels) { root._dirtyToplevels = false; Hyprland.refreshToplevels(); }
+        }
     }
 
     Connections {
         target: Hyprland
         function onRawEvent(ev) {
             const n = ev.name;
-            if (n === "openwindow" || n === "closewindow" || n === "movewindow" || n === "movewindowv2"
-                || n === "activewindow" || n === "changefloatingmode" || n === "fullscreen"
-                || n === "workspace" || n === "workspacev2" || n === "createworkspace" || n === "createworkspacev2"
-                || n === "destroyworkspace" || n === "destroyworkspacev2" || n === "focusedmon") {
+            if (n === "openwindow" || n === "closewindow" || n === "movewindowv2" || n === "movewindow") {
+                root._dirtyWorkspaces = true;
+                root._dirtyToplevels = true;
+                refreshTimer.restart();
+            } else if (n === "activewindow" || n === "changefloatingmode" || n === "fullscreen") {
+                root._dirtyToplevels = true;
+                refreshTimer.restart();
+            } else if (n === "workspacev2" || n === "workspace" || n === "createworkspacev2" || n === "destroyworkspacev2") {
+                root._dirtyWorkspaces = true;
+                refreshTimer.restart();
+            } else if (n === "focusedmon" || n === "monitoradded" || n === "monitorremoved") {
+                root._dirtyMonitors = true;
+                root._dirtyWorkspaces = true;
                 refreshTimer.restart();
             }
         }

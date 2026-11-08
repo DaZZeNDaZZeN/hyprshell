@@ -73,7 +73,8 @@ Scope {
                     anchors.fill: parent
                     source: Wallpaper.current ? "file://" + Wallpaper.current : ""
                     fillMode: Image.PreserveAspectCrop
-                    sourceSize: Qt.size(surf.width, surf.height)
+                    sourceSize: Qt.size(Math.max(1, surf.width), Math.max(1, surf.height))
+                    cache: false
                     visible: false
                 }
                 MultiEffect { anchors.fill: parent; source: bgImg; blurEnabled: true; blurMax: 64; blur: 1.0; brightness: -0.12; saturation: -0.1 }

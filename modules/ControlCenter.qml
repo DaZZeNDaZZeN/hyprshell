@@ -187,7 +187,7 @@ Variants {
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 6
                                 Repeater {
-                                    model: Media.players
+                                    model: win.visible ? Media.players : []
                                     delegate: Rectangle {
                                         required property var modelData
                                         required property int index
@@ -229,7 +229,7 @@ Variants {
 
                         Rectangle {
                             id: art; x: 12; y: 12 + mediaCard.pagerOffset; width: 72; height: 72; radius: Theme.radiusS + 2; color: Theme.surface3; clip: true
-                            Image { anchors.fill: parent; source: Media.art; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(144, 144) }
+                            Image { anchors.fill: parent; source: win.visible ? Media.art : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready; sourceSize: Qt.size(144, 144) }
                             Icon { anchors.centerIn: parent; text: "\uf001"; font.pixelSize: 24; tint: Theme.subtext; visible: !Media.art }
                         }
                         Column {
@@ -252,15 +252,15 @@ Variants {
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
-                                Label { text: Media.formatTime(Media.position); font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 32 }
+                                Label { text: win.visible ? Media.formatTime(Media.position) : "0:00"; font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 32 }
                                 Slider {
                                     Layout.fillWidth: true
                                     implicitHeight: 20
                                     opacity: Media.length > 0 ? 1 : 0.45
-                                    value: Media.length > 0 ? Media.position / Media.length : 0
+                                    value: win.visible && Media.length > 0 ? Media.position / Media.length : 0
                                     onMoved: v => Media.seekRatio(v)
                                 }
-                                Label { text: Media.formatTime(Media.length); font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
+                                Label { text: win.visible ? Media.formatTime(Media.length) : "0:00"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
@@ -312,7 +312,7 @@ Variants {
                     ListView {
                         id: wl
                         Layout.fillWidth: true; Layout.fillHeight: true
-                        clip: true; spacing: 4; model: Network.wifiEnabled ? Network.networks : []
+                        clip: true; spacing: 4; model: win.visible && Network.wifiEnabled ? Network.networks : []
                         boundsBehavior: Flickable.StopAtBounds
                         delegate: Rectangle {
                             id: wrow
@@ -365,7 +365,7 @@ Variants {
                     ListView {
                         Layout.fillWidth: true; Layout.fillHeight: true
                         clip: true; spacing: 4
-                        model: Bt.on ? Bt.devices.slice().sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired)) : []
+                        model: win.visible && Bt.on ? Bt.devices.slice().sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired)) : []
                         boundsBehavior: Flickable.StopAtBounds
                         delegate: Rectangle {
                             id: drow
@@ -408,7 +408,7 @@ Variants {
                             spacing: 6
                             Label { text: "Output device"; color: Theme.subtext; font.pixelSize: Theme.fsS }
                             Repeater {
-                                model: Audio.sinks
+                                model: win.visible ? Audio.sinks : []
                                 delegate: Rectangle {
                                     required property var modelData
                                     readonly property bool cur: Audio.sink === modelData
@@ -422,7 +422,7 @@ Variants {
                             }
                             Label { Layout.topMargin: 4; text: "Input device"; color: Theme.subtext; font.pixelSize: Theme.fsS }
                             Repeater {
-                                model: Audio.sources
+                                model: win.visible ? Audio.sources : []
                                 delegate: Rectangle {
                                     required property var modelData
                                     readonly property bool cur: Audio.source === modelData
@@ -442,7 +442,7 @@ Variants {
                             }
                             Label { Layout.topMargin: 4; text: "Applications"; color: Theme.subtext; font.pixelSize: Theme.fsS }
                             Repeater {
-                                model: Audio.streams
+                                model: win.visible ? Audio.streams : []
                                 delegate: Item {
                                     required property var modelData
                                     Layout.fillWidth: true; height: 56

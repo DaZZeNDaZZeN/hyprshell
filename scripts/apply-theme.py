@@ -30,19 +30,45 @@ on_accent = "#111111" if lum(accent) > 0.5 else "#ffffff"
 sub = mix(text, bg, 0.4)
 
 
+_procs = []
+
+
 def run(*cmd):
     try:
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        _procs.append(subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except Exception:
         pass
+
+
+def flush_procs():
+    for p in _procs:
+        try:
+            p.wait(timeout=5)
+        except Exception:
+            pass
+    _procs.clear()
+
+
+def write_if_changed(path, content):
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        try:
+            if path.read_text() == content:
+                return
+        except Exception:
+            pass
+    path.write_text(content)
 
 
 def write_block(path, block, start="/* hyprshell:begin */", end="/* hyprshell:end */"):
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     old = path.read_text() if path.exists() else ""
-    old = re.sub(re.escape(start) + r".*?" + re.escape(end) + r"\n?", "", old, flags=re.S)
-    path.write_text(old + start + "\n" + block + "\n" + end + "\n")
+    cleaned = re.sub(re.escape(start) + r".*?" + re.escape(end) + r"\n?", "", old, flags=re.S)
+    new_text = cleaned + start + "\n" + block + "\n" + end + "\n"
+    if new_text != old:
+        path.write_text(new_text)
 
 
 # ---------------- Hyprland (live + persisted) ----------------
@@ -83,24 +109,36 @@ function M.apply()
 end
 return M
 '''
-(home / ".config/hypr").mkdir(parents=True, exist_ok=True)
-(home / ".config/hypr/hyprshell_colors.lua").write_text(hypr_lua)
+hypr_colors_file = home / ".config/hypr/hyprshell_colors.lua"
+write_if_changed(hypr_colors_file, hypr_lua)
 if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
     run("hyprctl", "eval",
         f'hl.config({{general={{col={{active_border="{hexcol(accent,"ee")}",inactive_border="{hexcol(inactive,"aa")}"}}}}}})')
 
 # ---------------- custom shell colours for other tools ----------------
 colors_json = home / ".config/hyprshell/colors.json"
-colors_json.parent.mkdir(parents=True, exist_ok=True)
-colors_json.write_text(
-    '{"mode":"%s","accent":"%s","bg":"%s","surface":"%s","text":"%s"}\n' % (mode, accent, bg, surface, text))
+colors_payload = (
+    '{"mode":"%s","accent":"%s","bg":"%s","surface":"%s","text":"%s","icon":"%s","cursor":"%s","csize":"%s","sync":"%s"}\n'
+    % (mode, accent, bg, surface, text, icon, cursor, csize, sync)
+)
+custom_css = home / ".config/hyprshell/custom-gtk.css"
+extra = custom_css.read_text() if custom_css.exists() else ""
+
+if colors_json.exists() and (home / ".local/share/color-schemes/Hyprshell.colors").exists():
+    try:
+        if colors_json.read_text() == colors_payload and not extra:
+            flush_procs()
+            sys.exit(0)
+    except Exception:
+        pass
+
+write_if_changed(colors_json, colors_payload)
 
 if sync != "1":
+    flush_procs()
     sys.exit(0)
 
 # ---------------- GTK 3 / 4 ----------------
-custom_css = home / ".config/hyprshell/custom-gtk.css"
-extra = custom_css.read_text() if custom_css.exists() else ""
 card = mix(surface, text, 0.04)
 gtk = f'''@define-color accent_color {accent};
 @define-color accent_bg_color {accent};
@@ -311,13 +349,11 @@ inactiveForeground={inact_fg}
 """
 
 kcs_dir = home / ".local/share/color-schemes"
-kcs_dir.mkdir(parents=True, exist_ok=True)
 kcs_file = kcs_dir / "Hyprshell.colors"
-kcs_file.write_text(kcolorscheme)
+write_if_changed(kcs_file, kcolorscheme)
 
 qt6_colors_dir = home / ".config/qt6ct/colors"
-qt6_colors_dir.mkdir(parents=True, exist_ok=True)
-(qt6_colors_dir / "Hyprshell.colors").write_text(kcolorscheme)
+write_if_changed(qt6_colors_dir / "Hyprshell.colors", kcolorscheme)
 
 active = [text, btn, light, mix(btn, "#ffffff", 0.15), dk, mid, text, "#ffffff", text, base, bg,
           "#000000", accent, on_accent, accent, mix(accent, text, 0.5), alt, "#000000", surface, text, sub, accent]
@@ -326,8 +362,7 @@ fmt = lambda l: ", ".join("#ff" + c_.lstrip("#") for c_ in l)
 scheme = f"[ColorScheme]\nactive_colors={fmt(active)}\ndisabled_colors={fmt(disabled)}\ninactive_colors={fmt(active)}\n"
 for q in ("qt6ct", "qt5ct"):
     p = home / ".config" / q
-    p.mkdir(parents=True, exist_ok=True)
-    (p / "style-colors.conf").write_text(scheme)
+    write_if_changed(p / "style-colors.conf", scheme)
     conf = p / f"{q}.conf"
     s = conf.read_text() if conf.exists() else "[Appearance]\n"
     if "[Appearance]" not in s:
@@ -341,7 +376,7 @@ for q in ("qt6ct", "qt5ct"):
     s = sk(s, "color_scheme_path", scheme_path)
     s = sk(s, "custom_palette", "true")
     s = sk(s, "icon_theme", icon)
-    conf.write_text(s)
+    write_if_changed(conf, s)
 
 # ---------------- KDE (Dolphin etc.) ----------------
 def kw(group, key, val, file="kdeglobals"):
@@ -368,3 +403,4 @@ kw("Colors:Tooltip", "ForegroundNormal", c(text))
 kw("Colors:Complementary", "BackgroundNormal", c(bg))
 kw("Colors:Header", "BackgroundNormal", c(bg))
 kw("Colors:Header", "ForegroundNormal", c(text))
+flush_procs()
