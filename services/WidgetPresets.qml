@@ -91,6 +91,8 @@ Singleton {
                 id: "w-clock",
                 type: "digital-clock",
                 x: 40, y: 60, width: 310, height: 150,
+                rotation: 0,
+                cornerRadius: -1,
                 customColor: "",
                 showBg: true,
                 bgOpacity: -1,
@@ -99,12 +101,16 @@ Singleton {
                 showDate: true,
                 timeSize: 68,
                 dateSize: 15,
+                timeColor: "",
+                dateColor: "",
                 align: "center"
             },
             {
                 id: "w-weather",
                 type: "weather",
                 x: 40, y: 224, width: 310, height: 130,
+                rotation: 0,
+                cornerRadius: -1,
                 customColor: "",
                 showBg: true,
                 bgOpacity: -1,
@@ -115,6 +121,8 @@ Singleton {
                 id: "w-system",
                 type: "system",
                 x: 40, y: 368, width: 310, height: 140,
+                rotation: 0,
+                cornerRadius: -1,
                 customColor: "",
                 showBg: true,
                 bgOpacity: -1,
@@ -126,6 +134,8 @@ Singleton {
                 id: "w-media",
                 type: "media",
                 x: 40, y: 522, width: 310, height: 176,
+                rotation: 0,
+                cornerRadius: -1,
                 customColor: "",
                 showBg: true,
                 bgOpacity: -1,
@@ -147,6 +157,8 @@ Singleton {
             y: 80 + off,
             width: 300,
             height: 150,
+            rotation: 0,
+            cornerRadius: -1,
             customColor: "",
             showBg: true,
             bgOpacity: -1
@@ -159,12 +171,15 @@ Singleton {
                 showDate: true,
                 timeSize: 64,
                 dateSize: 15,
+                timeColor: "",
+                dateColor: "",
                 align: "center"
             });
         }
         if (type === "analog-clock") {
             return Object.assign(base, {
                 width: 220, height: 220,
+                circularCard: false,
                 showSeconds: true,
                 showNumbers: true,
                 showTicks: true,

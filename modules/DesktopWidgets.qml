@@ -40,6 +40,7 @@ Variants {
                     y: modelData.y ?? 60
                     width: modelData.width ?? 300
                     height: modelData.height ?? 150
+                    rotation: modelData.rotation ?? 0
                     widget: modelData
                     editMode: false
                 }

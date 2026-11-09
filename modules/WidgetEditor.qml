@@ -30,6 +30,7 @@ Variants {
         WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
         property string activeTab: "properties" // "properties" | "add" | "presets"
+        property bool inspectorVisible: true
 
         Component.onCompleted: {
             if (screen && screen.name === Quickshell.screens[0].name)
@@ -39,6 +40,7 @@ Variants {
 
         onOpenChanged: {
             if (open) {
+                inspectorVisible = true;
                 Wallpaper.refresh();
                 WidgetPresets.editingPresetId = WidgetPresets.activePresetId;
                 const list = WidgetPresets.editingWidgets;
@@ -72,10 +74,10 @@ Variants {
                 if (win.selWidget) WidgetPresets.deleteWidget(win.selWidget.id);
             }
 
-            // Subtle dark scrim & optional alignment grid
+            // Subtle dark scrim (fades out when previewing whole desktop with inspector hidden)
             Rectangle {
                 anchors.fill: parent
-                color: Qt.rgba(0, 0, 0, win.open ? 0.22 : 0)
+                color: Qt.rgba(0, 0, 0, (win.open && win.inspectorVisible) ? 0.22 : 0)
                 Behavior on color { ColorAnimation { duration: Theme.anim } }
 
                 MouseArea {
@@ -87,11 +89,11 @@ Variants {
                 }
             }
 
-            // Alignment grid overlay when snapToGrid is enabled
+            // Alignment grid overlay when snapToGrid is enabled and inspector is visible
             Canvas {
                 id: gridCanvas
                 anchors.fill: parent
-                visible: win.open && WidgetPresets.snapToGrid
+                visible: win.open && win.inspectorVisible && WidgetPresets.snapToGrid
                 opacity: 0.18
                 property int step: Math.max(10, WidgetPresets.gridSize * 2)
                 onStepChanged: requestPaint()
@@ -132,17 +134,20 @@ Variants {
                         readonly property bool isSelected: WidgetPresets.selectedWidgetId === modelData.id
                         property bool dragging: false
                         property bool resizing: false
+                        property bool rotating: false
                         property real liveX: modelData.x ?? 40
                         property real liveY: modelData.y ?? 60
                         property real liveW: modelData.width ?? 300
                         property real liveH: modelData.height ?? 150
+                        property real liveRot: modelData.rotation ?? 0
 
                         onModelDataChanged: {
-                            if (!dragging && !resizing) {
+                            if (!dragging && !resizing && !rotating) {
                                 liveX = modelData.x ?? 40;
                                 liveY = modelData.y ?? 60;
                                 liveW = modelData.width ?? 300;
                                 liveH = modelData.height ?? 150;
+                                liveRot = modelData.rotation ?? 0;
                             }
                         }
 
@@ -150,9 +155,11 @@ Variants {
                         y: dragging ? liveY : (modelData.y ?? 60)
                         width: resizing ? liveW : (modelData.width ?? 300)
                         height: resizing ? liveH : (modelData.height ?? 150)
+                        rotation: rotating ? liveRot : (modelData.rotation ?? 0)
                         z: isSelected ? 20 : index + 1
 
                         DesktopWidgetView {
+                            id: wView
                             anchors.fill: parent
                             widget: wBox.modelData
                             editMode: true
@@ -181,6 +188,9 @@ Variants {
                                 wBox.liveY = origY;
                                 wBox.dragging = true;
                             }
+                            onDoubleClicked: {
+                                win.inspectorVisible = true;
+                            }
                             onPositionChanged: m => {
                                 if (!pressed || !wBox.dragging) return;
                                 const pt = moveMa.mapToItem(canvasLayer, m.x, m.y);
@@ -201,20 +211,81 @@ Variants {
                             onCanceled: wBox.dragging = false
                         }
 
-                        // Selection outline
+                        // Selection outline matching widget shape & corner radius
                         Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: -2
-                            radius: Theme.radiusL + 2
+                            anchors.centerIn: parent
+                            width: (wView.isCircularCard ? Math.min(parent.width, parent.height) : parent.width) + 4
+                            height: (wView.isCircularCard ? Math.min(parent.width, parent.height) : parent.height) + 4
+                            radius: wView.cardRadius + 2
                             color: "transparent"
                             border.width: wBox.isSelected ? 2 : (moveMa.containsMouse ? 1 : 0)
                             border.color: wBox.isSelected ? Theme.accent : Qt.rgba(1, 1, 1, 0.45)
                         }
 
+                        // Top rotation handle on selected widget
+                        Item {
+                            visible: wBox.isSelected
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: -30
+                            width: 24; height: 30
+
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: 18; width: 2; height: 12
+                                color: Theme.accent
+                            }
+                            Rectangle {
+                                id: rotKnob
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: 0; width: 22; height: 22; radius: 11
+                                color: Theme.accent
+                                border.width: 2; border.color: Theme.bg
+                                Icon {
+                                    anchors.centerIn: parent
+                                    text: "\uf01e"
+                                    font.pixelSize: 10
+                                    tint: Theme.onAccent
+                                }
+                                MouseArea {
+                                    id: rotMa
+                                    anchors.fill: parent
+                                    anchors.margins: -5
+                                    cursorShape: Qt.CrossCursor
+                                    onPressed: {
+                                        wBox.liveRot = wBox.modelData.rotation ?? 0;
+                                        wBox.rotating = true;
+                                    }
+                                    onPositionChanged: m => {
+                                        if (!pressed || !wBox.rotating) return;
+                                        const pt = rotMa.mapToItem(canvasLayer, m.x, m.y);
+                                        const cx = wBox.x + wBox.width / 2;
+                                        const cy = wBox.y + wBox.height / 2;
+                                        let deg = Math.atan2(pt.y - cy, pt.x - cx) * 180 / Math.PI + 90;
+                                        while (deg > 180) deg -= 360;
+                                        while (deg < -180) deg += 360;
+                                        if (WidgetPresets.snapToGrid)
+                                            deg = Math.round(deg / 5) * 5;
+                                        else
+                                            deg = Math.round(deg);
+                                        wBox.liveRot = deg;
+                                    }
+                                    onReleased: {
+                                        if (wBox.rotating) {
+                                            wBox.rotating = false;
+                                            WidgetPresets.updateWidget(wBox.modelData.id, {
+                                                rotation: Math.round(wBox.liveRot)
+                                            });
+                                        }
+                                    }
+                                    onCanceled: wBox.rotating = false
+                                }
+                            }
+                        }
+
                         // Floating header badge on selected widget
                         Rectangle {
                             visible: wBox.isSelected
-                            y: wBox.y < 42 ? wBox.height + 6 : -34
+                            y: wBox.y < 68 ? wBox.height + 8 : -62
                             x: 0
                             height: 28
                             width: Math.max(badgeRow.implicitWidth + 16, 160)
@@ -233,7 +304,10 @@ Variants {
                                     tint: Theme.accent
                                 }
                                 Label {
-                                    text: win.typeMeta(wBox.modelData.type).label + "  (" + Math.round(wBox.x) + ", " + Math.round(wBox.y) + ") · " + Math.round(wBox.width) + "×" + Math.round(wBox.height)
+                                    text: win.typeMeta(wBox.modelData.type).label
+                                        + "  (" + Math.round(wBox.x) + ", " + Math.round(wBox.y) + ") · "
+                                        + Math.round(wBox.width) + "×" + Math.round(wBox.height)
+                                        + (Math.round(wBox.rotation) !== 0 ? (" · " + Math.round(wBox.rotation) + "°") : "")
                                     font.pixelSize: Theme.fsS - 1
                                     font.weight: Font.DemiBold
                                 }
@@ -426,6 +500,12 @@ Variants {
                     }
                     Rectangle { width: 1; height: 18; color: Theme.border }
                     Button {
+                        text: win.inspectorVisible ? "Hide Panel (Preview)" : "Show Panel"
+                        glyph: win.inspectorVisible ? "\uf070" : "\uf06e"
+                        implicitHeight: 28
+                        onClicked: win.inspectorVisible = !win.inspectorVisible
+                    }
+                    Button {
                         text: "Done"
                         glyph: "\uf00c"
                         primary: true
@@ -438,7 +518,8 @@ Variants {
             // ==================== Dockable Inspector Panel ====================
             PopupCard {
                 id: inspector
-                shown: win.open
+                shown: win.open && win.inspectorVisible
+                visible: opacity > 0.01
                 width: 430
                 height: parent.height - 32
                 y: 16
@@ -477,6 +558,11 @@ Variants {
                             glyph: "\uf00a"
                             active: WidgetPresets.snapToGrid
                             onClicked: WidgetPresets.snapToGrid = !WidgetPresets.snapToGrid
+                        }
+                        IconButton {
+                            glyph: "\uf070"
+                            size: 30; iconSize: 12
+                            onClicked: win.inspectorVisible = false
                         }
                         IconButton {
                             glyph: "\uf00d"
@@ -1057,7 +1143,7 @@ Variants {
                                         }
                                     }
 
-                                    // ==================== Geometry (Move & Resize) ====================
+                                    // ==================== Geometry (Move, Resize & Rotate) ====================
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: geomCol.implicitHeight + 20
@@ -1070,7 +1156,7 @@ Variants {
                                             anchors { fill: parent; margins: 10 }
                                             spacing: 8
 
-                                            Label { text: "Position & Size (Drag on screen or adjust below)"; font.weight: Font.DemiBold; font.pixelSize: Theme.fsS + 1 }
+                                            Label { text: "Position, Size & Rotation"; font.weight: Font.DemiBold; font.pixelSize: Theme.fsS + 1 }
 
                                             GridLayout {
                                                 Layout.fillWidth: true
@@ -1113,6 +1199,57 @@ Variants {
                                                     IconButton { glyph: "\uf068"; size: 24; iconSize: 9; onClicked: win.patchSelected({ height: Math.max(48, (win.selWidget?.height ?? 150) - 10) }) }
                                                     Label { text: Math.round(win.selWidget?.height ?? 150) + " px"; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.fsS }
                                                     IconButton { glyph: "\uf067"; size: 24; iconSize: 9; onClicked: win.patchSelected({ height: (win.selWidget?.height ?? 150) + 10 }) }
+                                                }
+                                            }
+
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                                            // Rotation controls
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Label {
+                                                    text: "Rotation: " + Math.round(win.selWidget?.rotation ?? 0) + "°"
+                                                    font.pixelSize: Theme.fsS
+                                                    color: Theme.subtext
+                                                    Layout.preferredWidth: 96
+                                                }
+                                                IconButton {
+                                                    glyph: "\uf0e2"; size: 24; iconSize: 10
+                                                    onClicked: {
+                                                        let r = Math.round(win.selWidget?.rotation ?? 0) - 15;
+                                                        if (r < -180) r += 360;
+                                                        win.patchSelected({ rotation: r });
+                                                    }
+                                                }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: (win.selWidget?.rotation ?? 0) + 180
+                                                    max: 360
+                                                    onMoved: v => win.patchSelected({ rotation: Math.round(v - 180) })
+                                                }
+                                                IconButton {
+                                                    glyph: "\uf01e"; size: 24; iconSize: 10
+                                                    onClicked: {
+                                                        let r = Math.round(win.selWidget?.rotation ?? 0) + 15;
+                                                        if (r > 180) r -= 360;
+                                                        win.patchSelected({ rotation: r });
+                                                    }
+                                                }
+                                            }
+
+                                            Flow {
+                                                Layout.fillWidth: true
+                                                spacing: 5
+                                                Repeater {
+                                                    model: [-90, -45, -15, 0, 15, 45, 90, 180]
+                                                    delegate: Chip {
+                                                        required property int modelData
+                                                        implicitHeight: 24
+                                                        text: (modelData > 0 ? "+" : "") + modelData + "°"
+                                                        active: Math.round(win.selWidget?.rotation ?? 0) === modelData
+                                                        onClicked: win.patchSelected({ rotation: modelData })
+                                                    }
                                                 }
                                             }
                                         }
@@ -1232,6 +1369,30 @@ Variants {
                                                     onClicked: win.patchSelected({ bgOpacity: -1 })
                                                 }
                                             }
+
+                                            RowLayout {
+                                                visible: win.selWidget?.showBg !== false && !(win.selWidget?.type === "analog-clock" && win.selWidget?.circularCard === true)
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Label {
+                                                    text: "Corner radius: " + ((win.selWidget?.cornerRadius ?? -1) < 0 ? "Theme" : Math.round(win.selWidget?.cornerRadius ?? 0) + "px")
+                                                    font.pixelSize: Theme.fsS
+                                                    color: Theme.subtext
+                                                    Layout.preferredWidth: 120
+                                                }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: (win.selWidget?.cornerRadius ?? -1) < 0 ? Theme.radiusL : (win.selWidget?.cornerRadius ?? 0)
+                                                    max: 120
+                                                    onMoved: v => win.patchSelected({ cornerRadius: Math.round(v) })
+                                                }
+                                                Chip {
+                                                    visible: (win.selWidget?.cornerRadius ?? -1) >= 0
+                                                    text: "Theme"
+                                                    implicitHeight: 22
+                                                    onClicked: win.patchSelected({ cornerRadius: -1 })
+                                                }
+                                            }
                                         }
                                     }
 
@@ -1276,6 +1437,74 @@ Variants {
                                                 }
                                             }
 
+                                            // Time Text Color
+                                            Label { text: "Time Text Color"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            Flow {
+                                                Layout.fillWidth: true
+                                                spacing: 5
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Theme Text"
+                                                    active: (win.selWidget?.timeColor ?? "") === ""
+                                                    onClicked: win.patchSelected({ timeColor: "" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Widget / Accent"
+                                                    active: (win.selWidget?.timeColor ?? "") === "accent"
+                                                    onClicked: win.patchSelected({ timeColor: "accent" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Subtext"
+                                                    active: (win.selWidget?.timeColor ?? "") === "subtext"
+                                                    onClicked: win.patchSelected({ timeColor: "subtext" })
+                                                }
+                                                Repeater {
+                                                    model: WidgetPresets.colorSwatches.filter(c => c !== "")
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool active: (win.selWidget?.timeColor ?? "") === modelData
+                                                        width: 24; height: 24; radius: 12
+                                                        color: modelData
+                                                        border.width: active ? 2.5 : 1
+                                                        border.color: active ? Theme.text : Theme.border
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.patchSelected({ timeColor: modelData })
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                TextField {
+                                                    id: timeHexInput
+                                                    Layout.fillWidth: true
+                                                    height: 30
+                                                    placeholder: "Custom time hex (#ffffff)…"
+                                                    text: /^#[0-9a-fA-F]{6}$/.test(win.selWidget?.timeColor ?? "") ? (win.selWidget?.timeColor ?? "") : ""
+                                                    onAccepted: {
+                                                        const v = text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ timeColor: v });
+                                                    }
+                                                }
+                                                Button {
+                                                    text: "Set"
+                                                    implicitHeight: 28
+                                                    onClicked: {
+                                                        const v = timeHexInput.text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ timeColor: v });
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
                                             RowLayout {
                                                 Layout.fillWidth: true
                                                 Label { Layout.fillWidth: true; text: "Show Date"; font.pixelSize: Theme.fsS + 1 }
@@ -1313,6 +1542,80 @@ Variants {
                                                     }
                                                 }
                                             }
+
+                                            // Date Text Color
+                                            Label {
+                                                visible: win.selWidget?.showDate !== false
+                                                text: "Date Text Color"
+                                                font.pixelSize: Theme.fsS; color: Theme.subtext
+                                            }
+                                            Flow {
+                                                visible: win.selWidget?.showDate !== false
+                                                Layout.fillWidth: true
+                                                spacing: 5
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Widget / Accent"
+                                                    active: (win.selWidget?.dateColor ?? "") === ""
+                                                    onClicked: win.patchSelected({ dateColor: "" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Theme Text"
+                                                    active: (win.selWidget?.dateColor ?? "") === "text"
+                                                    onClicked: win.patchSelected({ dateColor: "text" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24
+                                                    text: "Subtext"
+                                                    active: (win.selWidget?.dateColor ?? "") === "subtext"
+                                                    onClicked: win.patchSelected({ dateColor: "subtext" })
+                                                }
+                                                Repeater {
+                                                    model: WidgetPresets.colorSwatches.filter(c => c !== "")
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool active: (win.selWidget?.dateColor ?? "") === modelData
+                                                        width: 24; height: 24; radius: 12
+                                                        color: modelData
+                                                        border.width: active ? 2.5 : 1
+                                                        border.color: active ? Theme.text : Theme.border
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.patchSelected({ dateColor: modelData })
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            RowLayout {
+                                                visible: win.selWidget?.showDate !== false
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                TextField {
+                                                    id: dateHexInput
+                                                    Layout.fillWidth: true
+                                                    height: 30
+                                                    placeholder: "Custom date hex (#7aa2f7)…"
+                                                    text: /^#[0-9a-fA-F]{6}$/.test(win.selWidget?.dateColor ?? "") ? (win.selWidget?.dateColor ?? "") : ""
+                                                    onAccepted: {
+                                                        const v = text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ dateColor: v });
+                                                    }
+                                                }
+                                                Button {
+                                                    text: "Set"
+                                                    implicitHeight: 28
+                                                    onClicked: {
+                                                        const v = dateHexInput.text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ dateColor: v });
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
                                             RowLayout {
                                                 Layout.fillWidth: true
@@ -1365,6 +1668,18 @@ Variants {
                                             anchors { fill: parent; margins: 10 }
                                             spacing: 8
                                             Label { text: "Analog Clock Settings"; font.weight: Font.DemiBold; font.pixelSize: Theme.fsS + 1 }
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Background Card Shape" }
+                                                Segmented {
+                                                    options: [
+                                                        { label: "Rounded", value: false },
+                                                        { label: "Circular", value: true }
+                                                    ]
+                                                    current: win.selWidget?.circularCard === true
+                                                    onPicked: v => win.patchSelected({ circularCard: v })
+                                                }
+                                            }
                                             RowLayout {
                                                 Layout.fillWidth: true
                                                 Label { Layout.fillWidth: true; text: "Show Second Hand" }

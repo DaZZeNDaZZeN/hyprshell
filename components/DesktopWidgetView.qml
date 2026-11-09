@@ -24,17 +24,25 @@ Item {
     readonly property real cardAlpha: (widget?.bgOpacity !== undefined && widget.bgOpacity >= 0)
         ? widget.bgOpacity
         : Config.o.widgetsOpacity
+    readonly property bool isCircularCard: wType === "analog-clock" && (widget?.circularCard === true)
+    readonly property real cardRadius: isCircularCard
+        ? (Math.min(width, height) / 2)
+        : ((widget?.cornerRadius !== undefined && widget.cornerRadius >= 0)
+            ? Math.min(widget.cornerRadius, Math.min(width, height) / 2)
+            : Theme.radiusL)
 
     // Hide media widget on desktop when hideWhenIdle is enabled and no player exists
     readonly property bool hiddenByIdle: !editMode && wType === "media" && (widget?.hideWhenIdle ?? false) && Media.player === null
     visible: !hiddenByIdle
     opacity: hiddenByIdle ? 0 : 1
 
-    // Background Card
+    // Background Card (supports circular shape for Analog Clock and custom corner radius for all widgets)
     Rectangle {
         id: bgRect
-        anchors.fill: parent
-        radius: Theme.radiusL
+        anchors.centerIn: parent
+        width: root.isCircularCard ? Math.min(root.width, root.height) : root.width
+        height: root.isCircularCard ? Math.min(root.width, root.height) : root.height
+        radius: root.cardRadius
         color: root.showCardBg ? Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.cardAlpha) : "transparent"
         border.width: root.showCardBg ? 1 : 0
         border.color: Theme.border
@@ -93,15 +101,31 @@ Item {
         anchors.fill: parent
         active: root.wType === "digital-clock"
         sourceComponent: Item {
+            id: digiRoot
             readonly property string tFmt: root.widget?.timeFormat || (Config.o.barClock24h ? "HH:mm" : "h:mm ap")
             readonly property string dFmt: root.widget?.dateFormat || "dddd, d MMMM"
             readonly property bool needsSec: tFmt.includes("s") || dFmt.includes("s")
             readonly property string alignMode: root.widget?.align || "center"
             readonly property int hAlign: alignMode === "left" ? Text.AlignLeft : (alignMode === "right" ? Text.AlignRight : Text.AlignHCenter)
 
+            readonly property color resolvedTimeColor: {
+                const c = root.widget?.timeColor ?? "";
+                if (c === "accent") return root.wColor;
+                if (c === "subtext") return Theme.subtext;
+                if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+                return Theme.text;
+            }
+            readonly property color resolvedDateColor: {
+                const c = root.widget?.dateColor ?? "";
+                if (c === "text") return Theme.text;
+                if (c === "subtext") return Theme.subtext;
+                if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+                return root.wColor;
+            }
+
             SystemClock {
                 id: digiClock
-                precision: parent.needsSec ? SystemClock.Seconds : SystemClock.Minutes
+                precision: digiRoot.needsSec ? SystemClock.Seconds : SystemClock.Minutes
             }
 
             Column {
@@ -112,21 +136,21 @@ Item {
 
                 Label {
                     width: parent.width
-                    horizontalAlignment: parent.parent.hAlign
-                    text: Qt.formatDateTime(digiClock.date, parent.parent.tFmt)
+                    horizontalAlignment: digiRoot.hAlign
+                    text: Qt.formatDateTime(digiClock.date, digiRoot.tFmt)
                     font.pixelSize: root.widget?.timeSize ?? 64
                     font.weight: Font.Light
-                    color: Theme.text
+                    color: digiRoot.resolvedTimeColor
                     elide: Text.ElideRight
                 }
                 Label {
                     visible: root.widget?.showDate !== false
                     width: parent.width
-                    horizontalAlignment: parent.parent.hAlign
-                    text: Qt.formatDateTime(digiClock.date, parent.parent.dFmt)
+                    horizontalAlignment: digiRoot.hAlign
+                    text: Qt.formatDateTime(digiClock.date, digiRoot.dFmt)
                     font.pixelSize: root.widget?.dateSize ?? 15
                     font.weight: Font.Medium
-                    color: root.wColor
+                    color: digiRoot.resolvedDateColor
                     elide: Text.ElideRight
                 }
             }
@@ -366,21 +390,44 @@ Item {
         anchors.fill: parent
         active: root.wType === "system"
         sourceComponent: Item {
+            id: sysRoot
             Component.onCompleted: SysInfo.users++
             Component.onDestruction: SysInfo.users--
 
-            readonly property var rows: {
-                const list = [];
-                if (root.widget?.showCpu !== false) {
-                    list.push({ n: "CPU", v: SysInfo.cpu, t: Math.round(SysInfo.cpu * 100) + "%" });
+            component SysMetricRow: RowLayout {
+                property string metricLabel: ""
+                property real metricValue: 0
+                property string metricText: ""
+                property int valueTextWidth: 42
+                Layout.fillWidth: true
+                spacing: 8
+                Label {
+                    text: parent.metricLabel
+                    Layout.preferredWidth: 38
+                    font.pixelSize: Theme.fsS + 1
+                    font.weight: Font.Medium
+                    color: Theme.subtext
                 }
-                if (root.widget?.showRam !== false) {
-                    list.push({ n: "RAM", v: SysInfo.mem, t: SysInfo.memUsedGb.toFixed(1) + " / " + SysInfo.memTotalGb.toFixed(1) + " GB" });
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 8
+                    radius: 4
+                    color: Theme.surface3
+                    Rectangle {
+                        width: parent.width * Math.max(0.02, Math.min(1, parent.parent.metricValue))
+                        height: parent.height
+                        radius: 4
+                        color: root.wColor
+                        Behavior on width { NumberAnimation { duration: Theme.anim * 2; easing.type: Easing.OutCubic } }
+                    }
                 }
-                if (root.widget?.showDisk !== false) {
-                    list.push({ n: "Disk", v: SysInfo.disk, t: Math.round(SysInfo.disk * 100) + "%" });
+                Label {
+                    text: parent.metricText
+                    Layout.preferredWidth: parent.valueTextWidth
+                    horizontalAlignment: Text.AlignRight
+                    font.pixelSize: Theme.fsS
+                    color: Theme.subtext
                 }
-                return list;
             }
 
             ColumnLayout {
@@ -388,40 +435,26 @@ Item {
                 anchors.margins: 16
                 spacing: 8
 
-                Repeater {
-                    model: parent.parent.rows
-                    delegate: RowLayout {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Label {
-                            text: modelData.n
-                            Layout.preferredWidth: 38
-                            font.pixelSize: Theme.fsS + 1
-                            font.weight: Font.Medium
-                            color: Theme.subtext
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 8
-                            radius: 4
-                            color: Theme.surface3
-                            Rectangle {
-                                width: parent.width * Math.max(0.02, Math.min(1, modelData.v))
-                                height: parent.height
-                                radius: 4
-                                color: root.wColor
-                                Behavior on width { NumberAnimation { duration: Theme.anim * 2; easing.type: Easing.OutCubic } }
-                            }
-                        }
-                        Label {
-                            text: modelData.t
-                            Layout.preferredWidth: modelData.n === "RAM" ? 86 : 42
-                            horizontalAlignment: Text.AlignRight
-                            font.pixelSize: Theme.fsS
-                            color: Theme.subtext
-                        }
-                    }
+                SysMetricRow {
+                    visible: root.widget?.showCpu !== false
+                    metricLabel: "CPU"
+                    metricValue: SysInfo.cpu
+                    metricText: Math.round(SysInfo.cpu * 100) + "%"
+                    valueTextWidth: 42
+                }
+                SysMetricRow {
+                    visible: root.widget?.showRam !== false
+                    metricLabel: "RAM"
+                    metricValue: SysInfo.mem
+                    metricText: SysInfo.memUsedGb.toFixed(1) + " / " + SysInfo.memTotalGb.toFixed(1) + " GB"
+                    valueTextWidth: 88
+                }
+                SysMetricRow {
+                    visible: root.widget?.showDisk !== false
+                    metricLabel: "Disk"
+                    metricValue: SysInfo.disk
+                    metricText: Math.round(SysInfo.disk * 100) + "%"
+                    valueTextWidth: 42
                 }
             }
         }
@@ -434,6 +467,7 @@ Item {
         anchors.fill: parent
         active: root.wType === "media"
         sourceComponent: Item {
+            id: mediaRoot
             readonly property bool showArt: root.widget?.showArt !== false
             readonly property bool showSeek: root.widget?.showSeek !== false
             readonly property bool showVol: root.widget?.showVolume !== false
@@ -446,7 +480,7 @@ Item {
 
                 // Player switcher row
                 RowLayout {
-                    visible: parent.parent.showPager
+                    visible: mediaRoot.showPager
                     Layout.fillWidth: true
                     height: 22
                     spacing: 4
@@ -456,7 +490,7 @@ Item {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 4
                         Repeater {
-                            model: parent.parent.parent.showPager ? Media.players : []
+                            model: mediaRoot.showPager ? Media.players : []
                             delegate: Rectangle {
                                 required property var modelData
                                 required property int index
@@ -500,7 +534,7 @@ Item {
                     spacing: 12
 
                     Rectangle {
-                        visible: parent.parent.parent.showArt
+                        visible: mediaRoot.showArt
                         Layout.preferredWidth: 66
                         Layout.preferredHeight: 66
                         radius: Theme.radiusS + 2
@@ -553,7 +587,7 @@ Item {
 
                 // Seek bar
                 RowLayout {
-                    visible: parent.parent.showSeek
+                    visible: mediaRoot.showSeek
                     Layout.fillWidth: true
                     spacing: 6
                     Label { text: Media.formatTime(Media.position); font.pixelSize: Theme.fsS; color: Theme.subtext; Layout.preferredWidth: 30 }
@@ -568,7 +602,7 @@ Item {
 
                 // Volume bar
                 RowLayout {
-                    visible: parent.parent.showVol
+                    visible: mediaRoot.showVol
                     Layout.fillWidth: true
                     spacing: 6
                     IconButton {
@@ -601,12 +635,13 @@ Item {
         anchors.fill: parent
         active: root.wType === "button"
         sourceComponent: Item {
+            id: btnRoot
             readonly property string layoutMode: root.widget?.layout || "horizontal"
             readonly property bool showLbl: (root.widget?.showLabel !== false) && layoutMode !== "icon-only"
 
             Rectangle {
                 anchors.fill: parent
-                radius: Theme.radiusL
+                radius: root.cardRadius
                 color: btnMa.pressed ? root.wColorSoft : (btnMa.containsMouse ? root.wColorDim : "transparent")
                 scale: btnMa.pressed ? 0.96 : 1.0
                 Behavior on color { ColorAnimation { duration: Theme.animFast } }
@@ -614,14 +649,14 @@ Item {
 
                 // Horizontal layout
                 RowLayout {
-                    visible: parent.parent.layoutMode === "horizontal"
+                    visible: btnRoot.layoutMode === "horizontal"
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 12
                     Rectangle {
                         Layout.preferredWidth: Math.min(42, parent.height)
                         Layout.preferredHeight: Layout.preferredWidth
-                        radius: Theme.radius
+                        radius: Math.min(Theme.radius, Layout.preferredWidth / 2)
                         color: root.wColor
                         Icon {
                             anchors.centerIn: parent
@@ -631,7 +666,7 @@ Item {
                         }
                     }
                     ColumnLayout {
-                        visible: parent.parent.parent.showLbl
+                        visible: btnRoot.showLbl
                         Layout.fillWidth: true
                         spacing: 1
                         Label {
@@ -652,14 +687,14 @@ Item {
 
                 // Vertical / Icon-only layout
                 Column {
-                    visible: parent.parent.layoutMode !== "horizontal"
+                    visible: btnRoot.layoutMode !== "horizontal"
                     anchors.centerIn: parent
                     spacing: 6
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: parent.parent.parent.showLbl ? 44 : Math.min(root.width, root.height) * 0.56
+                        width: btnRoot.showLbl ? 44 : Math.min(root.width, root.height) * 0.56
                         height: width
-                        radius: Theme.radius
+                        radius: Math.min(Theme.radius, width / 2)
                         color: root.wColor
                         Icon {
                             anchors.centerIn: parent
@@ -669,7 +704,7 @@ Item {
                         }
                     }
                     Label {
-                        visible: parent.parent.parent.showLbl
+                        visible: btnRoot.showLbl
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.max(40, root.width - 16)
                         horizontalAlignment: Text.AlignHCenter
@@ -897,10 +932,11 @@ Item {
         anchors.fill: parent
         active: root.wType === "audio-mixer"
         sourceComponent: Item {
+            id: mixerRoot
             readonly property bool showMaster: root.widget?.showMaster !== false
             readonly property bool showMic: root.widget?.showMic !== false
             readonly property bool showOutDevs: root.widget?.showOutputDevices !== false
-            readonly property bool showInDevs: root.widget?.showInputDevices ?? false
+            readonly property bool showInDevs: root.widget?.showInputDevices === true
             readonly property bool showApps: root.widget?.showApps !== false
 
             Flickable {
@@ -927,7 +963,7 @@ Item {
 
                     // 1. Master Output Volume
                     ColumnLayout {
-                        visible: parent.parent.parent.showMaster
+                        visible: mixerRoot.showMaster
                         Layout.fillWidth: true
                         spacing: 4
                         Label { text: "Master Output"; font.pixelSize: Theme.fsS; color: Theme.subtext }
@@ -958,7 +994,7 @@ Item {
 
                     // 2. Microphone Volume
                     ColumnLayout {
-                        visible: parent.parent.parent.showMic
+                        visible: mixerRoot.showMic
                         Layout.fillWidth: true
                         spacing: 4
                         Label { text: "Microphone"; font.pixelSize: Theme.fsS; color: Theme.subtext }
@@ -989,12 +1025,12 @@ Item {
 
                     // 3. Output Devices (Sinks) with per-device volume
                     ColumnLayout {
-                        visible: parent.parent.parent.showOutDevs
+                        visible: mixerRoot.showOutDevs
                         Layout.fillWidth: true
                         spacing: 4
                         Label { text: "Output Devices"; font.pixelSize: Theme.fsS; color: Theme.subtext }
                         Repeater {
-                            model: parent.visible ? Audio.sinks : []
+                            model: mixerRoot.showOutDevs ? Audio.sinks : []
                             delegate: Rectangle {
                                 id: sinkRow
                                 required property var modelData
@@ -1059,16 +1095,22 @@ Item {
                                 }
                             }
                         }
+                        Label {
+                            visible: Audio.sinks.length === 0
+                            text: "No output devices detected"
+                            color: Theme.subtext
+                            font.pixelSize: Theme.fsS
+                        }
                     }
 
                     // 4. Input Devices (Sources) with per-device volume
                     ColumnLayout {
-                        visible: parent.parent.parent.showInDevs
+                        visible: mixerRoot.showInDevs
                         Layout.fillWidth: true
                         spacing: 4
                         Label { text: "Input Devices"; font.pixelSize: Theme.fsS; color: Theme.subtext }
                         Repeater {
-                            model: parent.visible ? Audio.sources : []
+                            model: mixerRoot.showInDevs ? Audio.sources : []
                             delegate: Rectangle {
                                 id: srcRow
                                 required property var modelData
@@ -1133,16 +1175,22 @@ Item {
                                 }
                             }
                         }
+                        Label {
+                            visible: Audio.sources.length === 0
+                            text: "No input devices detected"
+                            color: Theme.subtext
+                            font.pixelSize: Theme.fsS
+                        }
                     }
 
                     // 5. Application Streams
                     ColumnLayout {
-                        visible: parent.parent.parent.showApps
+                        visible: mixerRoot.showApps
                         Layout.fillWidth: true
                         spacing: 4
                         Label { text: "Applications"; font.pixelSize: Theme.fsS; color: Theme.subtext }
                         Repeater {
-                            model: parent.visible ? Audio.streams : []
+                            model: mixerRoot.showApps ? Audio.streams : []
                             delegate: Rectangle {
                                 id: appStreamRow
                                 required property var modelData
@@ -1199,6 +1247,15 @@ Item {
                             color: Theme.subtext
                             font.pixelSize: Theme.fsS
                         }
+                    }
+
+                    Label {
+                        visible: !mixerRoot.showMaster && !mixerRoot.showMic && !mixerRoot.showOutDevs && !mixerRoot.showInDevs && !mixerRoot.showApps
+                        text: "All mixer sections are hidden — enable sections in widget properties"
+                        color: Theme.subtext
+                        font.pixelSize: Theme.fsS
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
                     }
                 }
             }
