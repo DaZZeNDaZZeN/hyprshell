@@ -54,7 +54,7 @@ Singleton {
             }
         }
     }
-    readonly property bool active: root.users > 0 && Config.o.widgetsEnabled && Config.o.widgetWeather
+    readonly property bool active: root.users > 0
     Timer { interval: 1800000; repeat: true; running: root.active; triggeredOnStart: true; onTriggered: root.refresh() }
     Connections { target: Config.o; function onWeatherCityChanged() { if (root.active) root.refresh(); } }
 }

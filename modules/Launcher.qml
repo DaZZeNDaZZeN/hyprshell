@@ -78,6 +78,7 @@ Variants {
             { title: "Reboot", sub: "Session", glyph: "\uf021", run: () => Actions.reboot() },
             { title: "Power off", sub: "Session", glyph: "\uf011", run: () => Actions.poweroff() },
             { title: "Settings", sub: "Shell", glyph: "\uf013", run: () => Panels.open("settings") },
+            { title: "Desktop widget editor", sub: "Shell", glyph: "\uf009", run: () => Panels.open("widgeteditor") },
             { title: "Wallpaper browser", sub: "Shell", glyph: "\uf03e", run: () => Panels.open("wallhaven") },
             { title: "Clipboard history", sub: "Shell", glyph: "\uf328", run: () => Panels.open("clipboard") },
             { title: "Control center", sub: "Shell", glyph: "\uf1de", run: () => Panels.open("controlcenter") },

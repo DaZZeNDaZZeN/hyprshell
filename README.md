@@ -22,9 +22,19 @@ A full-featured, modular desktop shell for **Hyprland** built with **Quickshell*
   - Hovering a running app displays static window miniatures (`ScreencopyView`) with window titles and close buttons
   - Right-click context menu to open new windows, pin/unpin apps, or close all windows
   - Floating or edge-attached styles, customizable icon size, opacity, and auto-hide (with **"Keep visible on empty workspace"**)
-- **Desktop Widgets** ([`modules/DesktopWidgets.qml`](./modules/DesktopWidgets.qml))
-  - Clock, Weather (Open-Meteo), System Monitor (CPU, RAM, Disk), Now Playing Media, and Quick App Links
-  - 9 screen positions: `top-left`, `top-center`, `top-right`, `left-center`, `center`, `right-center`, `bottom-left`, `bottom-center`, `bottom-right`
+- **Desktop Widgets & Interactive Widget Editor** ([`modules/DesktopWidgets.qml`](./modules/DesktopWidgets.qml), [`modules/WidgetEditor.qml`](./modules/WidgetEditor.qml), [`components/DesktopWidgetView.qml`](./components/DesktopWidgetView.qml), [`services/WidgetPresets.qml`](./services/WidgetPresets.qml))
+  - **Widget Presets & Per-Wallpaper Assignment**: Create, edit, clone, rename, and delete widget presets (`~/.config/hyprshell/widgets.json`). Assign any preset to any wallpaper; wallpapers without a preset automatically use the editable `"Default"` preset.
+  - **Interactive Full-Screen Canvas**: Drag to move, drag handles to resize, snap to grid, duplicate, delete, and customize per-widget or preset-wide custom colors (following `Theme.accent` or any custom hex `#rrggbb`).
+  - **9 Built-in Widget Types**:
+    1. **Digital Clock**: Custom Qt time and date format strings, font sizes, and alignment.
+    2. **Analog Clock**: Classic dial with hour, minute, and toggleable second hand, numbers, ticks, and date.
+    3. **Weather**: Open-Meteo current conditions, humidity/wind details, and multi-day forecast.
+    4. **System Monitor**: Toggleable CPU, RAM, and Disk usage bars.
+    5. **Media Player**: MPRIS album art, multi-player switcher, playback controls, seek slider, and volume slider.
+    6. **Audio Visualizer**: Real-time 32-band spectrum analyzer ([`scripts/visualizer.py`](./scripts/visualizer.py)) supporting **Bars** or **Waves** in **Straight** or **Circular** geometry.
+    7. **Audio Mixer**: Full PipeWire mixer with individually toggleable sections for Master Output, Microphone Input, Output Devices & Volumes, Input Devices & Volumes, and Per-Application Stream Volumes.
+    8. **Calendar**: Interactive monthly calendar grid with month navigation and Monday/Sunday start-of-week toggle.
+    9. **Command Button**: Customizable button executing any shell command on click, with one-click presets for Launcher, Settings, Session control, Media control, and apps (`kitty`, `firefox`, `dolphin`).
 - **Overlay Panels**
   - **Application Launcher** ([`modules/Launcher.qml`](./modules/Launcher.qml)): Launch apps (sorted by usage frequency), switch open windows, run shell commands (`>`), calculate math expressions (`=`), search the web (`?`), or trigger session/shell actions
   - **Workspace Switcher** ([`modules/WorkspaceSwitcher.qml`](./modules/WorkspaceSwitcher.qml)): 10-workspace overview grid with proportional static window miniatures, keyboard navigation (`Arrows`, `1–0`, `Enter`), and click-to-switch
@@ -135,7 +145,8 @@ hyprshell/
 ├── modules/                   # Desktop bars, dock, widgets, and overlay panels
 ├── scripts/
 │   ├── apply-theme.py         # Generates KColorScheme (.colors), GTK 3/4 CSS, and Hyprland colors
-│   └── extract-colors.py      # Extracts dominant accent color from current wallpaper
+│   ├── extract-colors.py      # Extracts dominant accent color from current wallpaper
+│   └── visualizer.py          # Real-time 32-band audio spectrum analyzer for visualizer widgets
 ├── pam/
 │   └── password.conf          # PAM configuration for the lock screen
 └── hypr/                      # Hyprland Lua configuration files (~/.config/hypr/)
@@ -187,8 +198,9 @@ Configured in [`hypr/keybindings.lua`](./hypr/keybindings.lua):
 You can control `hyprshell` from scripts or custom keybinds using `qs -c hyprshell ipc call shell <command>`:
 
 ```bash
-# Toggle panels: launcher, workspaces, controlcenter, notifications, settings, clipboard, wallhaven, session
+# Toggle panels: launcher, workspaces, controlcenter, notifications, settings, widgeteditor, clipboard, wallhaven, session
 qs -c hyprshell ipc call shell toggle launcher
+qs -c hyprshell ipc call shell toggle widgeteditor
 
 # Open a specific Settings page: appearance, wallpaper, bar, dock, widgets, notifs, keys, system
 qs -c hyprshell ipc call shell open settings appearance

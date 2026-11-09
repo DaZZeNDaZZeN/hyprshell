@@ -159,7 +159,26 @@ Variants {
                         Button { text: "Browse Wallhaven"; glyph: "\uf002"; primary: true; onClicked: Panels.open("wallhaven") }
                         Button { text: "Random"; glyph: "\uf074"; onClicked: Wallpaper.random() }
                         Button { text: "Next"; glyph: "\uf051"; onClicked: Wallpaper.next() }
-                        Button { text: "Refresh"; glyph: "\uf021"; onClicked: Wallpaper.refresh() } }
+                        Button { text: "Refresh"; glyph: "\uf021"; onClicked: Wallpaper.refresh() }
+                        Button { text: "Widget Editor"; glyph: "\uf009"; onClicked: Panels.open("widgeteditor") } }
+                    SettingRow {
+                        title: "Widget preset for current wallpaper"
+                        desc: (WidgetPresets.wallpaperMap && WidgetPresets.wallpaperMap[Wallpaper.current])
+                            ? ("Assigned: " + (WidgetPresets.presets[WidgetPresets.wallpaperMap[Wallpaper.current]]?.name ?? "Default"))
+                            : "Unassigned — automatically using Default preset"
+                        Flow {
+                            width: 380; spacing: 6
+                            Repeater {
+                                model: win.visible && wallpaperPage.visible ? WidgetPresets.presetList : []
+                                delegate: Chip {
+                                    required property var modelData
+                                    text: modelData.id === "default" ? "Default" : modelData.name
+                                    active: WidgetPresets.presetForWallpaper(Wallpaper.current) === modelData.id
+                                    onClicked: WidgetPresets.assignPresetToWallpaper(Wallpaper.current, modelData.id)
+                                }
+                            }
+                        }
+                    }
                     Section { text: "Behaviour" }
                     SettingRow { title: "Fill mode"; Segmented { options: [{ label: "Crop", value: "crop" }, { label: "Fit", value: "fit" }, { label: "Stretch", value: "stretch" }]; current: win.o.wallpaperFill; onPicked: v => win.o.wallpaperFill = v } }
                     SettingRow { title: "Slideshow"; desc: "Rotate through wallpapers in the folder."
@@ -378,32 +397,126 @@ Variants {
                 Page {
                     id: widgetsPage
                     key: "widgets"
-                    Section { text: "Desktop widgets" }
-                    SettingRow { title: "Enable widgets"; Sw { checked: win.o.widgetsEnabled; onToggled: v => win.o.widgetsEnabled = v } }
-                    SettingRow { title: "Opacity"; desc: Math.round(win.o.widgetsOpacity * 100) + "%"; Sl { value: win.o.widgetsOpacity - 0.1; max: 0.9; onMoved: v => win.o.widgetsOpacity = Math.round((v + 0.1) * 100) / 100 } }
-                    SettingRow { title: "Position"; Grid { columns: 3; spacing: 6
-                        Repeater { model: ["top-left", "top-center", "top-right", "left-center", "center", "right-center", "bottom-left", "bottom-center", "bottom-right"]
-                            delegate: Chip { required property var modelData; text: modelData; active: win.o.widgetsPosition === modelData; onClicked: win.o.widgetsPosition = modelData } } } }
-                    SettingRow { title: "Clock"; Sw { checked: win.o.widgetClock; onToggled: v => win.o.widgetClock = v } }
-                    SettingRow { title: "Weather"; Sw { checked: win.o.widgetWeather; onToggled: v => win.o.widgetWeather = v } }
-                    SettingRow { title: "System monitor"; Sw { checked: win.o.widgetSystem; onToggled: v => win.o.widgetSystem = v } }
-                    SettingRow { title: "Active media"; Sw { checked: win.o.widgetMedia; onToggled: v => win.o.widgetMedia = v } }
-                    SettingRow { title: "App links"; Sw { checked: win.o.widgetLinks; onToggled: v => win.o.widgetLinks = v } }
-                    Section { text: "Weather" }
-                    SettingRow { title: "City"; desc: "Leave empty to detect automatically."; TextField { width: 220; text: win.o.weatherCity; onAccepted: win.o.weatherCity = text } }
-                    SettingRow { title: "Fahrenheit"; Sw { checked: win.o.weatherFahrenheit; onToggled: v => win.o.weatherFahrenheit = v } }
-                    Section { text: "App links" }
-                    Repeater {
-                        model: win.visible && widgetsPage.visible ? win.o.appLinks : []
-                        delegate: SettingRow {
-                            required property var modelData
-                            title: Apps.lookup(modelData)?.name ?? modelData; desc: modelData
-                            Button { text: "Remove"; danger: true; onClicked: win.o.appLinks = win.o.appLinks.filter(p => p !== modelData) }
+                    Section { text: "Desktop widgets & editor" }
+                    SettingRow {
+                        title: "Interactive Widget Editor"
+                        desc: "Add, move, resize, recolor, and configure Digital/Analog Clocks, Weather, System Monitor, Media Player, Audio Visualizer, Audio Mixer, Calendar, and Command Buttons."
+                        Button {
+                            text: "Open Desktop Widget Editor"
+                            glyph: "\uf009"
+                            primary: true
+                            onClicked: Panels.open("widgeteditor")
                         }
                     }
-                    SettingRow { title: "Add link"; desc: "Desktop file id or a shell command"
-                        TextField { id: linkId; width: 220; placeholder: "app id"; onAccepted: { if (text) { win.o.appLinks = win.o.appLinks.concat([text]); text = ""; } } }
-                        Button { text: "Add"; primary: true; onClicked: { if (linkId.text) { win.o.appLinks = win.o.appLinks.concat([linkId.text]); linkId.text = ""; } } } }
+                    SettingRow { title: "Enable desktop widgets"; Sw { checked: win.o.widgetsEnabled; onToggled: v => win.o.widgetsEnabled = v } }
+                    SettingRow { title: "Default card opacity"; desc: Math.round(win.o.widgetsOpacity * 100) + "%"; Sl { value: win.o.widgetsOpacity - 0.1; max: 0.9; onMoved: v => win.o.widgetsOpacity = Math.round((v + 0.1) * 100) / 100 } }
+
+                    Section { text: "Widget presets (" + WidgetPresets.presetList.length + ")" }
+                    SettingRow {
+                        title: "Current wallpaper preset"
+                        desc: (WidgetPresets.wallpaperMap && WidgetPresets.wallpaperMap[Wallpaper.current])
+                            ? ("Assigned to " + Wallpaper.current.split("/").pop())
+                            : "No preset assigned to current wallpaper — using Default preset"
+                        Flow {
+                            width: 390; spacing: 6
+                            Repeater {
+                                model: win.visible && widgetsPage.visible ? WidgetPresets.presetList : []
+                                delegate: Chip {
+                                    required property var modelData
+                                    text: modelData.id === "default" ? "Default (Fallback)" : modelData.name
+                                    active: WidgetPresets.presetForWallpaper(Wallpaper.current) === modelData.id
+                                    onClicked: WidgetPresets.assignPresetToWallpaper(Wallpaper.current, modelData.id)
+                                }
+                            }
+                        }
+                    }
+                    Repeater {
+                        model: win.visible && widgetsPage.visible ? WidgetPresets.presetList : []
+                        delegate: SettingRow {
+                            required property var modelData
+                            title: modelData.name + (modelData.id === "default" ? " (Default fallback)" : "")
+                            desc: (modelData.widgets?.length ?? 0) + " widgets"
+                            Button {
+                                text: "Edit in Canvas"
+                                glyph: "\uf044"
+                                primary: WidgetPresets.activePresetId === modelData.id
+                                onClicked: {
+                                    WidgetPresets.editingPresetId = modelData.id;
+                                    Panels.open("widgeteditor");
+                                }
+                            }
+                            Button {
+                                visible: modelData.id === "default"
+                                text: "Reset"
+                                glyph: "\uf021"
+                                onClicked: WidgetPresets.resetDefaultPreset()
+                            }
+                            Button {
+                                visible: modelData.id !== "default"
+                                text: "Delete"
+                                danger: true
+                                onClicked: WidgetPresets.deletePreset(modelData.id)
+                            }
+                        }
+                    }
+                    SettingRow {
+                        title: "Create new preset"
+                        desc: "Clones the currently active preset so you can customize it."
+                        TextField {
+                            id: settingsPresetName
+                            width: 220
+                            placeholder: "Preset name…"
+                            onAccepted: {
+                                if (text.trim()) {
+                                    WidgetPresets.createPreset(text, WidgetPresets.activePresetId);
+                                    text = "";
+                                }
+                            }
+                        }
+                        Button {
+                            text: "Create"
+                            glyph: "\uf067"
+                            primary: true
+                            onClicked: {
+                                WidgetPresets.createPreset(settingsPresetName.text, WidgetPresets.activePresetId);
+                                settingsPresetName.text = "";
+                            }
+                        }
+                    }
+
+                    Section { text: "Per-wallpaper preset assignments" }
+                    Repeater {
+                        model: win.visible && widgetsPage.visible ? Wallpaper.files : []
+                        delegate: SettingRow {
+                            id: wpAssignRow
+                            required property string modelData
+                            readonly property string pid: {
+                                const _ = WidgetPresets.revision;
+                                return WidgetPresets.presetForWallpaper(modelData);
+                            }
+                            title: modelData.split("/").pop() + (modelData === Wallpaper.current ? " (Current)" : "")
+                            desc: (WidgetPresets.wallpaperMap && WidgetPresets.wallpaperMap[modelData])
+                                ? ("Assigned preset: " + (WidgetPresets.presets[pid]?.name ?? "Default"))
+                                : "Using Default preset"
+                            Flow {
+                                width: 340; spacing: 5
+                                Repeater {
+                                    model: WidgetPresets.presetList
+                                    delegate: Chip {
+                                        required property var modelData
+                                        implicitHeight: 26
+                                        text: modelData.id === "default" ? "Default" : modelData.name
+                                        active: wpAssignRow.pid === modelData.id
+                                        onClicked: WidgetPresets.assignPresetToWallpaper(wpAssignRow.modelData, modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Section { text: "Weather widget options" }
+                    SettingRow { title: "City"; desc: "Leave empty to detect automatically."; TextField { width: 220; text: win.o.weatherCity; onAccepted: win.o.weatherCity = text } }
+                    SettingRow { title: "Fahrenheit"; Sw { checked: win.o.weatherFahrenheit; onToggled: v => win.o.weatherFahrenheit = v } }
                 }
 
                 // ================= Notifications & OSD =================

@@ -16,7 +16,7 @@ Singleton {
     property int users: 0           // consumers bump this to enable polling
     property var _prev: null
 
-    readonly property bool active: root.users > 0 && Config.o.widgetsEnabled && Config.o.widgetSystem
+    readonly property bool active: root.users > 0
 
     FileView { id: stat; path: "/proc/stat"; onLoaded: {
         const p = text().split("\n")[0].trim().split(/\s+/).slice(1).map(Number);

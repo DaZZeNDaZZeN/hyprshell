@@ -24,6 +24,7 @@ ShellRoot {
     ClipboardPanel {}
     WallhavenBrowser {}
     Settings {}
+    WidgetEditor {}
     ScreenshotOverlay {}
 
     // always-on
