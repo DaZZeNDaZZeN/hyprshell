@@ -15,6 +15,7 @@ Variants {
         screen: modelData
         name: "clipboard"
         property int sel: 0
+        Component.onCompleted: { void Clipboard.entries; }
         readonly property var shownEntries: {
             if (!win.visible) return [];
             const q = search.text.trim().toLowerCase();

@@ -9,6 +9,8 @@ import qs.services
 import qs.modules
 
 ShellRoot {
+    Component.onCompleted: { void Clipboard.entries; }
+
     // desktop layer
     WallpaperLayer {}
     DesktopWidgets {}

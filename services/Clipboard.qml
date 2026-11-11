@@ -9,6 +9,7 @@ import qs.config
 Singleton {
     id: root
     property var entries: []        // [{type: "text"|"image", text, image, pinned, time}]
+    property bool loaded: false
     readonly property string store: Config.dir + "/clipboard.json"
     readonly property string watchScript: Qt.resolvedUrl("../scripts/clip-watch.sh").toString().replace("file://", "")
 
@@ -43,13 +44,17 @@ Singleton {
                     time: e.time || Date.now()
                 }));
             } catch (e) {}
+            root.loaded = true;
+        }
+        onLoadFailed: {
+            root.loaded = true;
         }
     }
-    function persist() { file.setText(JSON.stringify(root.entries)); }
+    function persist() { if (root.loaded) file.setText(JSON.stringify(root.entries)); }
 
     Process {
         id: textWatcher
-        running: true
+        running: root.loaded
         command: ["wl-paste", "--type", "text", "--watch", "bash", root.watchScript, "text"]
         stdout: SplitParser {
             onRead: line => {
@@ -62,7 +67,7 @@ Singleton {
 
     Process {
         id: imageWatcher
-        running: true
+        running: root.loaded
         command: ["wl-paste", "--type", "image/png", "--watch", "bash", root.watchScript, "image"]
         stdout: SplitParser {
             onRead: line => {
