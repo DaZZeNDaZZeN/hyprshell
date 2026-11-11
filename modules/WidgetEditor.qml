@@ -1066,7 +1066,10 @@ Variants {
                                             required property int index
                                             readonly property var meta: win.typeMeta(modelData.type)
                                             glyph: meta.glyph
-                                            text: (index + 1) + ". " + (modelData.type === "button" && modelData.label ? modelData.label : meta.label)
+                                            text: (index + 1) + ". " + (
+                                                modelData.type === "button" && modelData.label ? modelData.label
+                                                : (modelData.type === "label" && modelData.text ? modelData.text.slice(0, 18) : meta.label)
+                                            )
                                             active: WidgetPresets.selectedWidgetId === modelData.id
                                             onClicked: WidgetPresets.selectedWidgetId = modelData.id
                                         }
@@ -1371,7 +1374,8 @@ Variants {
                                             }
 
                                             RowLayout {
-                                                visible: win.selWidget?.showBg !== false && !(win.selWidget?.type === "analog-clock" && win.selWidget?.circularCard === true)
+                                                visible: (win.selWidget?.showBg !== false || win.selWidget?.type === "image")
+                                                    && !((win.selWidget?.type === "analog-clock" || win.selWidget?.type === "image") && win.selWidget?.circularCard === true)
                                                 Layout.fillWidth: true
                                                 spacing: 8
                                                 Label {
@@ -2108,6 +2112,367 @@ Variants {
                                                                     command: modelData.cmd
                                                                 })
                                                             }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 10. TEXT LABEL
+                                    Rectangle {
+                                        visible: win.selWidget?.type === "label"
+                                        Layout.fillWidth: true
+                                        implicitHeight: lblPropCol.implicitHeight + 20
+                                        radius: Theme.radiusS + 2
+                                        color: Theme.surface2
+                                        border.width: 1; border.color: Theme.border
+
+                                        ColumnLayout {
+                                            id: lblPropCol
+                                            anchors { fill: parent; margins: 10 }
+                                            spacing: 8
+                                            Label { text: "Text Label Settings"; font.weight: Font.DemiBold; font.pixelSize: Theme.fsS + 1 }
+
+                                            Label { text: "Main Text"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            TextField {
+                                                Layout.fillWidth: true
+                                                height: 34
+                                                placeholder: "Enter label text…"
+                                                text: win.selWidget?.text ?? ""
+                                                onEdited: win.patchSelected({ text: text })
+                                                onAccepted: win.patchSelected({ text: text })
+                                            }
+
+                                            Label { text: "Secondary Text / Subtext (optional)"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            TextField {
+                                                Layout.fillWidth: true
+                                                height: 32
+                                                placeholder: "Optional subtitle or quote author…"
+                                                text: win.selWidget?.subtext ?? ""
+                                                onEdited: win.patchSelected({ subtext: text })
+                                                onAccepted: win.patchSelected({ subtext: text })
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { text: "Font Size (" + (win.selWidget?.fontSize ?? 32) + "px)"; font.pixelSize: Theme.fsS; Layout.preferredWidth: 118 }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: (win.selWidget?.fontSize ?? 32) - 10
+                                                    max: 110
+                                                    onMoved: v => win.patchSelected({ fontSize: Math.round(v + 10) })
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                visible: (win.selWidget?.subtext ?? "") !== ""
+                                                Layout.fillWidth: true
+                                                Label { text: "Subtext Size (" + (win.selWidget?.subtextSize ?? 15) + "px)"; font.pixelSize: Theme.fsS; Layout.preferredWidth: 118 }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: (win.selWidget?.subtextSize ?? 15) - 10
+                                                    max: 42
+                                                    onMoved: v => win.patchSelected({ subtextSize: Math.round(v + 10) })
+                                                }
+                                            }
+
+                                            Label { text: "Font Weight"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            Segmented {
+                                                options: [
+                                                    { label: "Light", value: "light" },
+                                                    { label: "Normal", value: "normal" },
+                                                    { label: "Medium", value: "medium" },
+                                                    { label: "Semi", value: "demibold" },
+                                                    { label: "Bold", value: "bold" }
+                                                ]
+                                                current: win.selWidget?.fontWeight ?? "bold"
+                                                onPicked: v => win.patchSelected({ fontWeight: v })
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Italic Style" }
+                                                Toggle { checked: win.selWidget?.italic === true; onToggled: v => win.patchSelected({ italic: v }) }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Word Wrap" }
+                                                Toggle { checked: win.selWidget?.wrap !== false; onToggled: v => win.patchSelected({ wrap: v }) }
+                                            }
+
+                                            Label { text: "Font Family (empty = Theme font)"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            TextField {
+                                                Layout.fillWidth: true
+                                                height: 32
+                                                placeholder: Theme.font
+                                                text: win.selWidget?.fontFamily ?? ""
+                                                onEdited: win.patchSelected({ fontFamily: text })
+                                                onAccepted: win.patchSelected({ fontFamily: text })
+                                            }
+                                            Flow {
+                                                Layout.fillWidth: true; spacing: 5
+                                                Repeater {
+                                                    model: [
+                                                        { label: "Theme Default", val: "" },
+                                                        { label: "Monospace", val: "monospace" },
+                                                        { label: "Sans", val: "Noto Sans" },
+                                                        { label: "Serif", val: "Noto Serif" }
+                                                    ]
+                                                    delegate: Chip {
+                                                        required property var modelData
+                                                        implicitHeight: 24
+                                                        text: modelData.label
+                                                        active: (win.selWidget?.fontFamily ?? "") === modelData.val
+                                                        onClicked: win.patchSelected({ fontFamily: modelData.val })
+                                                    }
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Horizontal Align" }
+                                                Segmented {
+                                                    options: [
+                                                        { label: "Left", value: "left" },
+                                                        { label: "Center", value: "center" },
+                                                        { label: "Right", value: "right" }
+                                                    ]
+                                                    current: win.selWidget?.align ?? "center"
+                                                    onPicked: v => win.patchSelected({ align: v })
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Vertical Align" }
+                                                Segmented {
+                                                    options: [
+                                                        { label: "Top", value: "top" },
+                                                        { label: "Middle", value: "center" },
+                                                        { label: "Bottom", value: "bottom" }
+                                                    ]
+                                                    current: win.selWidget?.valign ?? "center"
+                                                    onPicked: v => win.patchSelected({ valign: v })
+                                                }
+                                            }
+
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                                            // Main Text Color
+                                            Label { text: "Main Text Color"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            Flow {
+                                                Layout.fillWidth: true; spacing: 5
+                                                Chip {
+                                                    implicitHeight: 24; text: "Theme Text"
+                                                    active: (win.selWidget?.textColor ?? "") === ""
+                                                    onClicked: win.patchSelected({ textColor: "" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24; text: "Widget / Accent"
+                                                    active: (win.selWidget?.textColor ?? "") === "accent"
+                                                    onClicked: win.patchSelected({ textColor: "accent" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24; text: "Subtext"
+                                                    active: (win.selWidget?.textColor ?? "") === "subtext"
+                                                    onClicked: win.patchSelected({ textColor: "subtext" })
+                                                }
+                                                Repeater {
+                                                    model: WidgetPresets.colorSwatches.filter(c => c !== "")
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool active: (win.selWidget?.textColor ?? "") === modelData
+                                                        width: 24; height: 24; radius: 12
+                                                        color: modelData
+                                                        border.width: active ? 2.5 : 1
+                                                        border.color: active ? Theme.text : Theme.border
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.patchSelected({ textColor: modelData })
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            RowLayout {
+                                                Layout.fillWidth: true; spacing: 6
+                                                TextField {
+                                                    id: lblTextHexInput
+                                                    Layout.fillWidth: true; height: 30
+                                                    placeholder: "Custom text hex (#ffffff)…"
+                                                    text: /^#[0-9a-fA-F]{6}$/.test(win.selWidget?.textColor ?? "") ? (win.selWidget?.textColor ?? "") : ""
+                                                    onAccepted: {
+                                                        const v = text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ textColor: v });
+                                                    }
+                                                }
+                                                Button {
+                                                    text: "Set"; implicitHeight: 28
+                                                    onClicked: {
+                                                        const v = lblTextHexInput.text.trim();
+                                                        if (v === "" || /^#[0-9a-fA-F]{6}$/.test(v))
+                                                            win.patchSelected({ textColor: v });
+                                                    }
+                                                }
+                                            }
+
+                                            // Subtext Color
+                                            Label {
+                                                visible: (win.selWidget?.subtext ?? "") !== ""
+                                                text: "Subtext Color"; font.pixelSize: Theme.fsS; color: Theme.subtext
+                                            }
+                                            Flow {
+                                                visible: (win.selWidget?.subtext ?? "") !== ""
+                                                Layout.fillWidth: true; spacing: 5
+                                                Chip {
+                                                    implicitHeight: 24; text: "Widget / Accent"
+                                                    active: (win.selWidget?.subtextColor ?? "") === ""
+                                                    onClicked: win.patchSelected({ subtextColor: "" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24; text: "Theme Text"
+                                                    active: (win.selWidget?.subtextColor ?? "") === "text"
+                                                    onClicked: win.patchSelected({ subtextColor: "text" })
+                                                }
+                                                Chip {
+                                                    implicitHeight: 24; text: "Subtext"
+                                                    active: (win.selWidget?.subtextColor ?? "") === "subtext"
+                                                    onClicked: win.patchSelected({ subtextColor: "subtext" })
+                                                }
+                                                Repeater {
+                                                    model: WidgetPresets.colorSwatches.filter(c => c !== "")
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool active: (win.selWidget?.subtextColor ?? "") === modelData
+                                                        width: 24; height: 24; radius: 12
+                                                        color: modelData
+                                                        border.width: active ? 2.5 : 1
+                                                        border.color: active ? Theme.text : Theme.border
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.patchSelected({ subtextColor: modelData })
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 11. IMAGE / PHOTO
+                                    Rectangle {
+                                        visible: win.selWidget?.type === "image"
+                                        Layout.fillWidth: true
+                                        implicitHeight: imgPropCol.implicitHeight + 20
+                                        radius: Theme.radiusS + 2
+                                        color: Theme.surface2
+                                        border.width: 1; border.color: Theme.border
+
+                                        ColumnLayout {
+                                            id: imgPropCol
+                                            anchors { fill: parent; margins: 10 }
+                                            spacing: 8
+                                            Label { text: "Image / Photo Settings"; font.weight: Font.DemiBold; font.pixelSize: Theme.fsS + 1 }
+
+                                            Label { text: "Image File Path or URL (supports PNG, JPG, WebP, animated GIF)"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            TextField {
+                                                Layout.fillWidth: true
+                                                height: 34
+                                                placeholder: "/path/to/image.png, ~/Pictures/..., or https://..."
+                                                text: win.selWidget?.imagePath ?? ""
+                                                onEdited: win.patchSelected({ imagePath: text })
+                                                onAccepted: win.patchSelected({ imagePath: text })
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Shape" }
+                                                Segmented {
+                                                    options: [
+                                                        { label: "Rounded", value: false },
+                                                        { label: "Circular", value: true }
+                                                    ]
+                                                    current: win.selWidget?.circularCard === true
+                                                    onPicked: v => win.patchSelected({ circularCard: v })
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { Layout.fillWidth: true; text: "Image Fill Mode" }
+                                                Segmented {
+                                                    options: [
+                                                        { label: "Crop", value: "crop" },
+                                                        { label: "Fit", value: "fit" },
+                                                        { label: "Stretch", value: "stretch" }
+                                                    ]
+                                                    current: win.selWidget?.fillMode ?? "crop"
+                                                    onPicked: v => win.patchSelected({ fillMode: v })
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { text: "Image Opacity (" + Math.round((win.selWidget?.imageOpacity ?? 1.0) * 100) + "%)"; font.pixelSize: Theme.fsS; Layout.preferredWidth: 132 }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: (win.selWidget?.imageOpacity ?? 1.0) - 0.1
+                                                    max: 0.9
+                                                    onMoved: v => win.patchSelected({ imageOpacity: Math.round((v + 0.1) * 100) / 100 })
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Label { text: "Frame Padding (" + Math.round(win.selWidget?.padding ?? 0) + "px)"; font.pixelSize: Theme.fsS; Layout.preferredWidth: 132 }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    value: win.selWidget?.padding ?? 0
+                                                    max: 32
+                                                    onMoved: v => win.patchSelected({ padding: Math.round(v) })
+                                                }
+                                            }
+
+                                            Label { text: "Caption Overlay (optional)"; font.pixelSize: Theme.fsS; color: Theme.subtext }
+                                            TextField {
+                                                Layout.fillWidth: true
+                                                height: 32
+                                                placeholder: "Optional caption text…"
+                                                text: win.selWidget?.caption ?? ""
+                                                onEdited: win.patchSelected({ caption: text })
+                                                onAccepted: win.patchSelected({ caption: text })
+                                            }
+
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+                                            Label { text: "Quick Pick from Wallpaper Library"; font.pixelSize: Theme.fsS; font.weight: Font.DemiBold; color: Theme.accent }
+                                            Flow {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Repeater {
+                                                    model: win.visible && win.selWidget?.type === "image" ? Wallpaper.files : []
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool cur: (win.selWidget?.imagePath ?? "") === modelData
+                                                        width: 82; height: 52; radius: 6
+                                                        color: Theme.surface3; clip: true
+                                                        border.width: cur ? 2.5 : 1
+                                                        border.color: cur ? Theme.accent : Theme.border
+                                                        Image {
+                                                            anchors.fill: parent
+                                                            source: "file://" + modelData
+                                                            fillMode: Image.PreserveAspectCrop
+                                                            sourceSize: Qt.size(164, 104)
+                                                            asynchronous: true
+                                                            cache: false
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.patchSelected({ imagePath: modelData })
                                                         }
                                                     }
                                                 }

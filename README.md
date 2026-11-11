@@ -25,9 +25,9 @@ A full-featured, modular desktop shell for **Hyprland** built with **Quickshell*
 - **Desktop Widgets & Interactive Widget Editor** ([`modules/DesktopWidgets.qml`](./modules/DesktopWidgets.qml), [`modules/WidgetEditor.qml`](./modules/WidgetEditor.qml), [`components/DesktopWidgetView.qml`](./components/DesktopWidgetView.qml), [`services/WidgetPresets.qml`](./services/WidgetPresets.qml))
   - **Widget Presets & Per-Wallpaper Assignment**: Create, edit, clone, rename, and delete widget presets (`~/.config/hyprshell/widgets.json`). Assign any preset to any wallpaper; wallpapers without a preset automatically use the editable `"Default"` preset.
   - **Interactive Full-Screen Canvas**: Drag to move, drag handles to resize, snap to grid, duplicate, delete, and customize per-widget or preset-wide custom colors (following `Theme.accent` or any custom hex `#rrggbb`).
-  - **9 Built-in Widget Types**:
-    1. **Digital Clock**: Custom Qt time and date format strings, font sizes, and alignment.
-    2. **Analog Clock**: Classic dial with hour, minute, and toggleable second hand, numbers, ticks, and date.
+  - **11 Built-in Widget Types**:
+    1. **Digital Clock**: Custom Qt time and date format strings, separate time/date colors, font sizes, and alignment.
+    2. **Analog Clock**: Classic dial with hour, minute, and toggleable second hand, numbers, ticks, date, and rounded/circular card shape.
     3. **Weather**: Open-Meteo current conditions, humidity/wind details, and multi-day forecast.
     4. **System Monitor**: Toggleable CPU, RAM, and Disk usage bars.
     5. **Media Player**: MPRIS album art, multi-player switcher, playback controls, seek slider, and volume slider.
@@ -35,6 +35,8 @@ A full-featured, modular desktop shell for **Hyprland** built with **Quickshell*
     7. **Audio Mixer**: Full PipeWire mixer with individually toggleable sections for Master Output, Microphone Input, Output Devices & Volumes, Input Devices & Volumes, and Per-Application Stream Volumes.
     8. **Calendar**: Interactive monthly calendar grid with month navigation and Monday/Sunday start-of-week toggle.
     9. **Command Button**: Customizable button executing any shell command on click, with one-click presets for Launcher, Settings, Session control, Media control, and apps (`kitty`, `firefox`, `dolphin`).
+    10. **Text Label**: Customizable main text and subtext with font family, size, weight, italic, word wrap, horizontal/vertical alignment, and separate text/subtext colors.
+    11. **Image / Photo**: Displays any local image, animated GIF, or URL with rounded/circular clipping, crop/fit/stretch modes, opacity, frame padding, caption overlay, and quick wallpaper picker.
 - **Overlay Panels**
   - **Application Launcher** ([`modules/Launcher.qml`](./modules/Launcher.qml)): Launch apps (sorted by usage frequency), switch open windows, run shell commands (`>`), calculate math expressions (`=`), search the web (`?`), or trigger session/shell actions
   - **Workspace Switcher** ([`modules/WorkspaceSwitcher.qml`](./modules/WorkspaceSwitcher.qml)): 10-workspace overview grid with proportional static window miniatures, keyboard navigation (`Arrows`, `1–0`, `Enter`), and click-to-switch

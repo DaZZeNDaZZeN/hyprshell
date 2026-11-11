@@ -33,7 +33,7 @@ Singleton {
     property int gridSize: 10
     property string inspectorSide: "right" // "right" | "left"
 
-    // Catalog of all 9 supported widget types
+    // Catalog of all 11 supported widget types
     readonly property var widgetTypes: [
         { type: "digital-clock", label: "Digital Clock", glyph: "\uf017", desc: "Time & date with custom format strings" },
         { type: "analog-clock",  label: "Analog Clock",  glyph: "\uf1da", desc: "Classic clock face with hour, minute & second hands" },
@@ -43,7 +43,9 @@ Singleton {
         { type: "visualizer",    label: "Audio Visualizer", glyph: "\uf028", desc: "Bars or waves in straight or circular layout" },
         { type: "audio-mixer",   label: "Audio Mixer",   glyph: "\uf1de", desc: "Output/input devices & per-app volume mixer" },
         { type: "calendar",      label: "Calendar",      glyph: "\uf073", desc: "Interactive monthly calendar grid" },
-        { type: "button",        label: "Command Button",glyph: "\uf120", desc: "Customizable button that runs any shell command" }
+        { type: "button",        label: "Command Button",glyph: "\uf120", desc: "Customizable button that runs any shell command" },
+        { type: "label",         label: "Text Label",    glyph: "\uf031", desc: "Custom text & subtext with font size, weight, alignment & colors" },
+        { type: "image",         label: "Image / Photo", glyph: "\uf03e", desc: "Display any image or GIF with rounded/circular frame & caption" }
     ]
 
     // Categorized example commands for the Command Button widget
@@ -249,6 +251,34 @@ Singleton {
                 command: "qs -c hyprshell ipc call shell toggle launcher",
                 showLabel: true,
                 layout: "horizontal" // "horizontal" | "vertical" | "icon-only"
+            });
+        }
+        if (type === "label") {
+            return Object.assign(base, {
+                width: 280, height: 100,
+                text: "Hello Desktop",
+                subtext: "",
+                fontSize: 32,
+                subtextSize: 15,
+                fontFamily: "",
+                fontWeight: "bold",   // "light" | "normal" | "medium" | "demibold" | "bold"
+                italic: false,
+                align: "center",      // "left" | "center" | "right"
+                valign: "center",     // "top" | "center" | "bottom"
+                textColor: "",        // "" = Theme.text, "accent" = wColor, "subtext" = Theme.subtext, or "#rrggbb"
+                subtextColor: "",     // "" = wColor, "text" = Theme.text, "subtext" = Theme.subtext, or "#rrggbb"
+                wrap: true
+            });
+        }
+        if (type === "image") {
+            return Object.assign(base, {
+                width: 280, height: 220,
+                imagePath: Wallpaper.current || "",
+                fillMode: "crop",     // "crop" | "fit" | "stretch"
+                imageOpacity: 1.0,
+                padding: 0,
+                circularCard: false,
+                caption: ""
             });
         }
         return base;

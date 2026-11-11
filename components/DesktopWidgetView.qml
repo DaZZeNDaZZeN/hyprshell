@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Widgets
 import Quickshell.Services.Mpris
 import QtQuick
 import QtQuick.Layouts
@@ -7,7 +8,7 @@ import qs.components
 import qs.services
 
 // Renders a single desktop widget instance of any type (digital-clock, analog-clock,
-// weather, system, media, button, visualizer, audio-mixer, calendar).
+// weather, system, media, button, visualizer, audio-mixer, calendar, label, image).
 Item {
     id: root
     required property var widget
@@ -24,7 +25,7 @@ Item {
     readonly property real cardAlpha: (widget?.bgOpacity !== undefined && widget.bgOpacity >= 0)
         ? widget.bgOpacity
         : Config.o.widgetsOpacity
-    readonly property bool isCircularCard: wType === "analog-clock" && (widget?.circularCard === true)
+    readonly property bool isCircularCard: (wType === "analog-clock" || wType === "image") && (widget?.circularCard === true)
     readonly property real cardRadius: isCircularCard
         ? (Math.min(width, height) / 2)
         : ((widget?.cornerRadius !== undefined && widget.cornerRadius >= 0)
@@ -1407,6 +1408,199 @@ Item {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 10. TEXT LABEL WIDGET
+    // =========================================================================
+    Loader {
+        anchors.fill: parent
+        active: root.wType === "label"
+        sourceComponent: Item {
+            id: lblRoot
+            readonly property string mainText: root.widget?.text ?? "Hello Desktop"
+            readonly property string subText: root.widget?.subtext ?? ""
+            readonly property int fSize: root.widget?.fontSize ?? 32
+            readonly property int subSize: root.widget?.subtextSize ?? 15
+            readonly property string fFamily: (root.widget?.fontFamily && root.widget.fontFamily.trim() !== "")
+                ? root.widget.fontFamily.trim()
+                : Theme.font
+            readonly property int fWeight: {
+                const w = root.widget?.fontWeight || "bold";
+                if (w === "light") return Font.Light;
+                if (w === "normal") return Font.Normal;
+                if (w === "medium") return Font.Medium;
+                if (w === "demibold") return Font.DemiBold;
+                return Font.Bold;
+            }
+            readonly property bool isItalic: root.widget?.italic === true
+            readonly property bool wordWrap: root.widget?.wrap !== false
+            readonly property string alignMode: root.widget?.align || "center"
+            readonly property string valignMode: root.widget?.valign || "center"
+            readonly property int hAlign: alignMode === "left" ? Text.AlignLeft : (alignMode === "right" ? Text.AlignRight : Text.AlignHCenter)
+
+            readonly property color resolvedTextColor: {
+                const c = root.widget?.textColor ?? "";
+                if (c === "accent") return root.wColor;
+                if (c === "subtext") return Theme.subtext;
+                if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+                return Theme.text;
+            }
+            readonly property color resolvedSubtextColor: {
+                const c = root.widget?.subtextColor ?? "";
+                if (c === "text") return Theme.text;
+                if (c === "subtext") return Theme.subtext;
+                if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
+                return root.wColor;
+            }
+
+            Column {
+                id: lblCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 14
+                spacing: 4
+                y: lblRoot.valignMode === "top"
+                    ? 14
+                    : (lblRoot.valignMode === "bottom"
+                        ? Math.max(14, parent.height - implicitHeight - 14)
+                        : Math.max(6, (parent.height - implicitHeight) / 2))
+
+                Text {
+                    width: parent.width
+                    horizontalAlignment: lblRoot.hAlign
+                    text: lblRoot.mainText
+                    textFormat: Text.PlainText
+                    font.family: lblRoot.fFamily
+                    font.pixelSize: lblRoot.fSize
+                    font.weight: lblRoot.fWeight
+                    font.italic: lblRoot.isItalic
+                    color: lblRoot.resolvedTextColor
+                    wrapMode: lblRoot.wordWrap ? Text.WordWrap : Text.NoWrap
+                    elide: lblRoot.wordWrap ? Text.ElideNone : Text.ElideRight
+                }
+                Text {
+                    visible: lblRoot.subText !== ""
+                    width: parent.width
+                    horizontalAlignment: lblRoot.hAlign
+                    text: lblRoot.subText
+                    textFormat: Text.PlainText
+                    font.family: lblRoot.fFamily
+                    font.pixelSize: lblRoot.subSize
+                    font.weight: Font.Medium
+                    font.italic: lblRoot.isItalic
+                    color: lblRoot.resolvedSubtextColor
+                    wrapMode: lblRoot.wordWrap ? Text.WordWrap : Text.NoWrap
+                    elide: lblRoot.wordWrap ? Text.ElideNone : Text.ElideRight
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 11. IMAGE / PHOTO WIDGET
+    // =========================================================================
+    Loader {
+        anchors.fill: parent
+        active: root.wType === "image"
+        sourceComponent: Item {
+            id: imgRoot
+            readonly property string rawPath: (root.widget?.imagePath ?? "").trim()
+            readonly property string resolvedSource: {
+                const p = rawPath;
+                if (!p) return "";
+                if (p.startsWith("http://") || p.startsWith("https://") || p.startsWith("file://")) return p;
+                if (p.startsWith("~/")) return "file://" + Quickshell.env("HOME") + p.slice(1);
+                if (p.startsWith("/")) return "file://" + p;
+                return "file://" + p;
+            }
+            readonly property bool isAnimatedGif: rawPath.toLowerCase().endsWith(".gif")
+            readonly property int fillEnum: {
+                const fm = root.widget?.fillMode || "crop";
+                if (fm === "fit") return Image.PreserveAspectFit;
+                if (fm === "stretch") return Image.Stretch;
+                return Image.PreserveAspectCrop;
+            }
+            readonly property real imgAlpha: Math.max(0.05, Math.min(1.0, root.widget?.imageOpacity ?? 1.0))
+            readonly property int pad: Math.max(0, Math.min(48, root.widget?.padding ?? 0))
+            readonly property string captionText: (root.widget?.caption ?? "").trim()
+
+            ClippingRectangle {
+                id: imgClip
+                anchors.centerIn: parent
+                width: (root.isCircularCard ? Math.min(root.width, root.height) : root.width) - imgRoot.pad * 2
+                height: (root.isCircularCard ? Math.min(root.width, root.height) : root.height) - imgRoot.pad * 2
+                radius: Math.max(0, root.cardRadius - imgRoot.pad)
+                color: "transparent"
+
+                Image {
+                    id: staticPic
+                    anchors.fill: parent
+                    visible: !imgRoot.isAnimatedGif && imgRoot.resolvedSource !== ""
+                    source: !imgRoot.isAnimatedGif ? imgRoot.resolvedSource : ""
+                    fillMode: imgRoot.fillEnum
+                    opacity: imgRoot.imgAlpha
+                    asynchronous: true
+                    smooth: true
+                    sourceSize: Qt.size(Math.max(128, Math.round(imgClip.width * 2)), Math.max(128, Math.round(imgClip.height * 2)))
+                }
+
+                AnimatedImage {
+                    id: animPic
+                    anchors.fill: parent
+                    visible: imgRoot.isAnimatedGif && imgRoot.resolvedSource !== ""
+                    source: imgRoot.isAnimatedGif ? imgRoot.resolvedSource : ""
+                    fillMode: imgRoot.fillEnum
+                    opacity: imgRoot.imgAlpha
+                    asynchronous: true
+                    smooth: true
+                    playing: root.visible
+                }
+
+                // Placeholder when no image path is set or image fails to load
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 6
+                    visible: imgRoot.resolvedSource === ""
+                        || (!imgRoot.isAnimatedGif && staticPic.status === Image.Error)
+                        || (imgRoot.isAnimatedGif && animPic.status === AnimatedImage.Error)
+                    Icon {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "\uf03e"
+                        font.pixelSize: 32
+                        tint: root.wColor
+                    }
+                    Label {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: imgRoot.resolvedSource === "" ? "Choose an image in Properties" : "Image not found"
+                        color: Theme.subtext
+                        font.pixelSize: Theme.fsS
+                    }
+                }
+
+                // Optional caption pill at bottom
+                Rectangle {
+                    visible: imgRoot.captionText !== ""
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(parent.width - 20, capLbl.implicitWidth + 20)
+                    height: 26
+                    radius: 13
+                    color: Qt.rgba(0, 0, 0, 0.65)
+                    Label {
+                        id: capLbl
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width - 16, implicitWidth)
+                        horizontalAlignment: Text.AlignHCenter
+                        text: imgRoot.captionText
+                        color: "#ffffff"
+                        font.pixelSize: Theme.fsS
+                        font.weight: Font.Medium
                     }
                 }
             }
