@@ -26,6 +26,9 @@ Singleton {
 
     PwObjectTracker { objects: [root.sink, root.source].concat(root.audioNodes) }
 
+    property int activeSliderDrags: 0
+    property double suppressAutoSoundUntil: 0
+
     Process {
         id: volSoundProc
         command: ["pw-play", root.volumeSound]
@@ -34,14 +37,31 @@ Singleton {
         id: volSoundTimer
         interval: 45
         onTriggered: {
-            if (!Osd.armed || root.muted) return;
-            if (volSoundProc.running) volSoundProc.running = false;
-            volSoundProc.running = true;
+            if (!Osd.armed || root.muted || root.activeSliderDrags > 0) return;
+            root.playVolumeSoundNow();
         }
+    }
+    function playVolumeSoundNow() {
+        if (!Osd.armed || root.muted) return;
+        if (volSoundProc.running) volSoundProc.running = false;
+        volSoundProc.running = true;
     }
     function playVolumeSound() {
         if (!Osd.armed || root.muted) return;
+        if (activeSliderDrags > 0 || Date.now() < suppressAutoSoundUntil) return;
         volSoundTimer.restart();
+    }
+    function beginSliderDrag() {
+        activeSliderDrags = Math.max(0, activeSliderDrags) + 1;
+        volSoundTimer.stop();
+    }
+    function endSliderDrag(playOnRelease) {
+        activeSliderDrags = Math.max(0, activeSliderDrags - 1);
+        suppressAutoSoundUntil = Date.now() + 200;
+        volSoundTimer.stop();
+        if (playOnRelease && activeSliderDrags === 0) {
+            playVolumeSoundNow();
+        }
     }
 
     function setVolume(v) { if (sink?.audio) { sink.audio.muted = false; sink.audio.volume = Math.max(0, Math.min(1.5, v)); } }

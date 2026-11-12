@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 // Accent-coloured slider. value is 0..1 (or 0..max).
 Item {
@@ -7,7 +8,9 @@ Item {
     property real value: 0
     property real max: 1
     property int trackHeight: 8
+    property bool volumeSlider: false
     signal moved(real value)
+    signal released()
     implicitHeight: 24
     implicitWidth: 160
 
@@ -42,9 +45,38 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        property bool dragging: false
         function upd(m) { root.moved(Math.max(0, Math.min(1, m.x / width)) * root.max); }
-        onPressed: m => upd(m)
+        onPressed: m => {
+            if (root.volumeSlider && !dragging) {
+                dragging = true;
+                Audio.beginSliderDrag();
+            }
+            upd(m);
+        }
         onPositionChanged: m => { if (pressed) upd(m); }
-        onWheel: w => root.moved(Math.max(0, Math.min(root.max, root.value + (w.angleDelta.y > 0 ? 0.03 : -0.03) * root.max)))
+        onReleased: {
+            if (dragging) {
+                dragging = false;
+                Audio.endSliderDrag(true);
+            }
+            root.released();
+        }
+        onCanceled: {
+            if (dragging) {
+                dragging = false;
+                Audio.endSliderDrag(false);
+            }
+        }
+        Component.onDestruction: {
+            if (dragging) {
+                dragging = false;
+                Audio.endSliderDrag(false);
+            }
+        }
+        onWheel: w => {
+            root.moved(Math.max(0, Math.min(root.max, root.value + (w.angleDelta.y > 0 ? 0.03 : -0.03) * root.max)));
+            if (root.volumeSlider) Audio.playVolumeSound();
+        }
     }
 }

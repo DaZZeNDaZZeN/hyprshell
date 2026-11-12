@@ -78,11 +78,12 @@ Variants {
             property string glyph
             property real value
             property real max: 1
+            property bool volumeSlider: false
             signal moved(real v)
             signal iconClicked()
             spacing: 10
             IconButton { glyph: parent.glyph; size: 34; iconSize: 16; onClicked: parent.iconClicked() }
-            Slider { Layout.fillWidth: true; value: parent.value; max: parent.max; onMoved: v => parent.moved(v) }
+            Slider { Layout.fillWidth: true; value: parent.value; max: parent.max; volumeSlider: parent.volumeSlider; onMoved: v => parent.moved(v) }
             Label { text: Math.round(parent.value / parent.max * 100) + "%"; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight; color: Theme.subtext; font.pixelSize: Theme.fsS + 1 }
         }
 
@@ -138,7 +139,7 @@ Variants {
                         ColumnLayout {
                             id: slCol
                             x: 14; y: 12; width: parent.width - 28; spacing: 6
-                            SliderRow { Layout.fillWidth: true; glyph: Audio.icon(Audio.volume, Audio.muted); value: Audio.volume; onMoved: v => Audio.setVolume(v); onIconClicked: Audio.toggleMute() }
+                            SliderRow { Layout.fillWidth: true; glyph: Audio.icon(Audio.volume, Audio.muted); value: Audio.volume; volumeSlider: true; onMoved: v => Audio.setVolume(v); onIconClicked: Audio.toggleMute() }
                             SliderRow { Layout.fillWidth: true; glyph: "\uf185"; value: Brightness.value; onMoved: v => Brightness.set(v) }
                         }
                     }
@@ -275,6 +276,7 @@ Variants {
                                     Layout.fillWidth: true
                                     implicitHeight: 20
                                     value: Media.muted ? 0 : Media.volume
+                                    volumeSlider: true
                                     onMoved: v => Media.setVolume(v)
                                 }
                                 Label { text: Math.round((Media.muted ? 0 : Media.volume) * 100) + "%"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
@@ -394,7 +396,7 @@ Variants {
                 ColumnLayout {
                     x: 16; y: 16; width: parent.width - 32; height: parent.height - 32; spacing: 10
                     PageHeader { title: "Audio" }
-                    SliderRow { Layout.fillWidth: true; glyph: Audio.icon(Audio.volume, Audio.muted); value: Audio.volume; onMoved: v => Audio.setVolume(v); onIconClicked: Audio.toggleMute() }
+                    SliderRow { Layout.fillWidth: true; glyph: Audio.icon(Audio.volume, Audio.muted); value: Audio.volume; volumeSlider: true; onMoved: v => Audio.setVolume(v); onIconClicked: Audio.toggleMute() }
                     SliderRow { Layout.fillWidth: true; glyph: Audio.micMuted ? "\uf131" : "\uf130"; value: Audio.micVolume; onMoved: v => Audio.setMic(v); onIconClicked: Audio.toggleMic() }
                     Flickable {
                         Layout.fillWidth: true
@@ -450,7 +452,7 @@ Variants {
                                     RowLayout {
                                         x: 0; y: 22; width: parent.width; spacing: 8
                                         IconButton { glyph: modelData.audio.muted ? "\ueee8" : "\uf028"; size: 28; iconSize: 12; onClicked: modelData.audio.muted = !modelData.audio.muted }
-                                        Slider { Layout.fillWidth: true; value: modelData.audio.volume; onMoved: v => modelData.audio.volume = v }
+                                        Slider { Layout.fillWidth: true; value: modelData.audio.volume; volumeSlider: true; onMoved: v => modelData.audio.volume = v }
                                     }
                                 }
                             }

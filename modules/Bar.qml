@@ -617,6 +617,7 @@ Variants {
                         Layout.fillWidth: true
                         implicitHeight: 20
                         value: Media.muted ? 0 : Media.volume
+                        volumeSlider: true
                         onMoved: v => Media.setVolume(v)
                     }
                     Label {

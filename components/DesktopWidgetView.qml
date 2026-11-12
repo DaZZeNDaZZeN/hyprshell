@@ -55,7 +55,9 @@ Item {
         property real value: 0
         property real max: 1
         property int trackHeight: 7
+        property bool volumeSlider: false
         signal moved(real value)
+        signal released()
         implicitHeight: 20
         implicitWidth: 120
         readonly property real frac: Math.max(0, Math.min(1, max > 0 ? value / max : 0))
@@ -88,10 +90,39 @@ Item {
             hoverEnabled: true
             enabled: !root.editMode
             cursorShape: Qt.PointingHandCursor
+            property bool dragging: false
             function upd(m) { sl.moved(Math.max(0, Math.min(1, m.x / Math.max(1, width))) * sl.max); }
-            onPressed: m => upd(m)
+            onPressed: m => {
+                if (sl.volumeSlider && !dragging) {
+                    dragging = true;
+                    Audio.beginSliderDrag();
+                }
+                upd(m);
+            }
             onPositionChanged: m => { if (pressed) upd(m); }
-            onWheel: w => sl.moved(Math.max(0, Math.min(sl.max, sl.value + (w.angleDelta.y > 0 ? 0.04 : -0.04) * sl.max)))
+            onReleased: {
+                if (dragging) {
+                    dragging = false;
+                    Audio.endSliderDrag(true);
+                }
+                sl.released();
+            }
+            onCanceled: {
+                if (dragging) {
+                    dragging = false;
+                    Audio.endSliderDrag(false);
+                }
+            }
+            Component.onDestruction: {
+                if (dragging) {
+                    dragging = false;
+                    Audio.endSliderDrag(false);
+                }
+            }
+            onWheel: w => {
+                sl.moved(Math.max(0, Math.min(sl.max, sl.value + (w.angleDelta.y > 0 ? 0.04 : -0.04) * sl.max)));
+                if (sl.volumeSlider) Audio.playVolumeSound();
+            }
         }
     }
 
@@ -615,6 +646,7 @@ Item {
                     WidgetSlider {
                         Layout.fillWidth: true
                         value: Media.muted ? 0 : Media.volume
+                        volumeSlider: true
                         onMoved: v => Media.setVolume(v)
                     }
                     Label {
@@ -981,6 +1013,7 @@ Item {
                                 Layout.fillWidth: true
                                 value: Audio.muted ? 0 : Audio.volume
                                 max: 1.0
+                                volumeSlider: true
                                 onMoved: v => Audio.setVolume(v)
                             }
                             Label {
@@ -1085,6 +1118,7 @@ Item {
                                             Layout.fillWidth: true
                                             implicitHeight: 16
                                             value: sinkRow.devMute ? 0 : sinkRow.devVol
+                                            volumeSlider: true
                                             onMoved: v => {
                                                 if (sinkRow.modelData?.audio) {
                                                     sinkRow.modelData.audio.muted = false;
@@ -1231,6 +1265,7 @@ Item {
                                             Layout.fillWidth: true
                                             implicitHeight: 16
                                             value: appStreamRow.appMute ? 0 : appStreamRow.appVol
+                                            volumeSlider: true
                                             onMoved: v => {
                                                 if (appStreamRow.modelData?.audio) {
                                                     appStreamRow.modelData.audio.muted = false;
