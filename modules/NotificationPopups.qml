@@ -6,7 +6,7 @@ import qs.config
 import qs.components
 import qs.services
 
-// Toast notifications. Each card slides/fades in and collapses away.
+// Toast notifications. Each card slides/fades in and collapses away without recreating sibling cards.
 Variants {
     model: Quickshell.screens
 
@@ -17,15 +17,15 @@ Variants {
         readonly property bool mine: Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name === modelData.name : modelData === Quickshell.screens[0]
         readonly property bool right: Config.o.notifPosition.endsWith("right")
         readonly property bool top: Config.o.notifPosition.startsWith("top")
-        anchors { top: win.top; bottom: !win.top; right: win.right; left: !win.right }
+        anchors { top: true; bottom: true; right: win.right; left: !win.right }
         implicitWidth: 392
-        implicitHeight: Math.max(1, stack.implicitHeight + 12)
         margins { top: Config.o.barEnabled && Config.o.barPosition === "top" && win.top ? 52 : 8; bottom: 8; right: 8; left: 8 }
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         visible: win.mine && Notifs.popups.length > 0
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "hyprshell-notifications"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         mask: Region { item: stack }
 
         Column {
@@ -35,16 +35,23 @@ Variants {
             y: win.top ? 0 : undefined
             anchors.bottom: win.top ? undefined : parent.bottom
             spacing: 10
+            move: Transition {
+                NumberAnimation { properties: "y"; duration: Theme.anim; easing.type: Easing.OutCubic }
+            }
+
             Repeater {
-                model: win.mine ? Notifs.popups.slice(0, 6) : []
+                model: ScriptModel {
+                    values: win.mine ? Notifs.popups.slice(0, 6) : []
+                }
                 delegate: Item {
                     id: slot
                     required property var modelData
                     property bool entered: false
+                    readonly property bool shown: entered && !(modelData && modelData.popupClosing)
                     width: stack.width
                     height: card.implicitHeight
                     implicitHeight: card.implicitHeight
-                    opacity: entered ? 1 : 0
+                    opacity: shown ? 1 : 0
                     Component.onCompleted: entered = true
                     Behavior on opacity { NumberAnimation { duration: Theme.anim } }
                     NotifCard {
@@ -53,7 +60,7 @@ Variants {
                         popupMode: true
                         width: parent.width
                         height: implicitHeight
-                        x: slot.entered ? 0 : (win.right ? 48 : -48)
+                        x: slot.shown ? 0 : (win.right ? 48 : -48)
                         Behavior on x { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
                     }
                 }

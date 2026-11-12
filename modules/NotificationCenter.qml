@@ -48,7 +48,9 @@ Variants {
                     id: list
                     Layout.fillWidth: true; Layout.fillHeight: true
                     clip: true; spacing: 8
-                    model: win.visible ? Notifs.items : []
+                    model: ScriptModel {
+                        values: win.visible ? Notifs.items : []
+                    }
                     boundsBehavior: Flickable.StopAtBounds
                     delegate: NotifCard { required property var modelData; notif: modelData; width: list.width }
                     add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.anim } }

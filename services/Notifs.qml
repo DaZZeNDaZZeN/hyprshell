@@ -27,21 +27,35 @@ Singleton {
         property bool critical: n.urgency === NotificationUrgency.Critical
         property bool alive: true
         property bool popup: !Config.o.dnd
+        property bool popupClosing: false
         property date time: new Date()
         property Timer timer: Timer {
             interval: Config.o.notifTimeout
-            running: w.popup && !w.critical && !hovered
-            onTriggered: w.popup = false
+            running: w.popup && !w.popupClosing && !w.critical && !hovered
+            onTriggered: w.closePopup()
+        }
+        property Timer closeTimer: Timer {
+            interval: Theme.anim
+            onTriggered: { w.popup = false; w.popupClosing = false; }
         }
         property bool hovered: false
         property Connections conn: Connections {
             target: w.n
-            function onClosed() { w.alive = false; w.popup = false; }
+            function onClosed() { w.alive = false; w.closePopup(); }
+        }
+        function closePopup() {
+            if (!popup) return;
+            if (Theme.anim <= 0) { popup = false; popupClosing = false; return; }
+            if (!popupClosing) {
+                popupClosing = true;
+                closeTimer.interval = Theme.anim;
+                closeTimer.restart();
+            }
         }
         function invoke(id) {
             if (!alive) return;
             for (const a of n.actions) if (a.identifier === id) a.invoke();
-            popup = false;
+            closePopup();
         }
     }
     Component { id: notifComp; Notif {} }
@@ -69,5 +83,5 @@ Singleton {
         for (const w of items) { if (w.alive) w.n.dismiss(); w.destroy(); }
         items = [];
     }
-    function hidePopup(w) { w.popup = false; }
+    function hidePopup(w) { w.closePopup(); }
 }
