@@ -1,12 +1,14 @@
 pragma Singleton
 
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 import qs.config
 
 Singleton {
     id: root
+    readonly property string volumeSound: Qt.resolvedUrl("../assets/volume.wav").toString().replace("file://", "")
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property var source: Pipewire.defaultAudioSource
     readonly property real volume: sink?.audio?.volume ?? 0
@@ -19,9 +21,28 @@ Singleton {
     readonly property var sources: audioNodes.filter(n => !n.isStream && !n.isSink
         && (!n.properties || !n.properties["media.class"] || n.properties["media.class"].startsWith("Audio/Source")))
     readonly property var streams: audioNodes.filter(n => n.isStream && (n.isSink
-        || (n.properties && n.properties["media.class"] === "Stream/Output/Audio")))
+        || (n.properties && n.properties["media.class"] === "Stream/Output/Audio"))
+        && n.name !== "pw-play" && n.properties?.["application.binary"] !== "pw-play")
 
     PwObjectTracker { objects: [root.sink, root.source].concat(root.audioNodes) }
+
+    Process {
+        id: volSoundProc
+        command: ["pw-play", root.volumeSound]
+    }
+    Timer {
+        id: volSoundTimer
+        interval: 45
+        onTriggered: {
+            if (!Osd.armed || root.muted) return;
+            if (volSoundProc.running) volSoundProc.running = false;
+            volSoundProc.running = true;
+        }
+    }
+    function playVolumeSound() {
+        if (!Osd.armed || root.muted) return;
+        volSoundTimer.restart();
+    }
 
     function setVolume(v) { if (sink?.audio) { sink.audio.muted = false; sink.audio.volume = Math.max(0, Math.min(1.5, v)); } }
     function step(d) { setVolume(Math.round((volume + d) * 100) / 100); }
@@ -48,7 +69,10 @@ Singleton {
         return (media && media !== app && !app.toLowerCase().includes(media.toLowerCase())) ? (app + " — " + media) : app;
     }
 
-    function osd() { Osd.show("volume", icon(volume, muted), muted ? "Muted" : Math.round(volume * 100) + "%", Math.min(1, volume), "Volume", !muted); }
+    function osd() {
+        Osd.show("volume", icon(volume, muted), muted ? "Muted" : Math.round(volume * 100) + "%", Math.min(1, volume), "Volume", !muted);
+        playVolumeSound();
+    }
     onVolumeChanged: osd()
     onMutedChanged: osd()
     onMicMutedChanged: Osd.show("mic", micMuted ? "\uf131" : "\uf130", micMuted ? "Mic muted" : "Mic on", -1, "Microphone", !micMuted)
