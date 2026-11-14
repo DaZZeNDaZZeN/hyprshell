@@ -176,6 +176,8 @@ Singleton {
         return Audio.streams.length === 1 ? Audio.streams[0] : null;
     }
 
+    readonly property bool hasOwnVolume: Boolean((player && player.volumeSupported) || (playerStream && playerStream.audio))
+
     readonly property real volume: {
         if (player && player.volumeSupported) return normalizeVolume(player, player.volume);
         if (playerStream && playerStream.audio) return Math.max(0, Math.min(1, playerStream.audio.volume));

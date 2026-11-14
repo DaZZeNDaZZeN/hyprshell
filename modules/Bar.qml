@@ -618,6 +618,7 @@ Variants {
                         implicitHeight: 20
                         value: Media.muted ? 0 : Media.volume
                         volumeSlider: true
+                        scaleVolumeSound: Media.hasOwnVolume
                         onMoved: v => Media.setVolume(v)
                     }
                     Label {

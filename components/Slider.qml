@@ -9,6 +9,7 @@ Item {
     property real max: 1
     property int trackHeight: 8
     property bool volumeSlider: false
+    property bool scaleVolumeSound: false
     signal moved(real value)
     signal released()
     implicitHeight: 24
@@ -46,7 +47,11 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         property bool dragging: false
-        function upd(m) { root.moved(Math.max(0, Math.min(1, m.x / width)) * root.max); }
+        property real lastVal: root.value
+        function upd(m) {
+            lastVal = Math.max(0, Math.min(1, m.x / Math.max(1, width))) * root.max;
+            root.moved(lastVal);
+        }
         onPressed: m => {
             if (root.volumeSlider && !dragging) {
                 dragging = true;
@@ -58,7 +63,7 @@ Item {
         onReleased: {
             if (dragging) {
                 dragging = false;
-                Audio.endSliderDrag(true);
+                Audio.endSliderDrag(true, root.scaleVolumeSound ? lastVal : 1.0);
             }
             root.released();
         }
@@ -75,8 +80,9 @@ Item {
             }
         }
         onWheel: w => {
-            root.moved(Math.max(0, Math.min(root.max, root.value + (w.angleDelta.y > 0 ? 0.03 : -0.03) * root.max)));
-            if (root.volumeSlider) Audio.playVolumeSound();
+            const nextVal = Math.max(0, Math.min(root.max, root.value + (w.angleDelta.y > 0 ? 0.03 : -0.03) * root.max));
+            root.moved(nextVal);
+            if (root.volumeSlider) Audio.playVolumeSound(root.scaleVolumeSound ? nextVal : 1.0);
         }
     }
 }

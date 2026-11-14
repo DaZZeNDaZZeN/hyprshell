@@ -277,6 +277,7 @@ Variants {
                                     implicitHeight: 20
                                     value: Media.muted ? 0 : Media.volume
                                     volumeSlider: true
+                                    scaleVolumeSound: Media.hasOwnVolume
                                     onMoved: v => Media.setVolume(v)
                                 }
                                 Label { text: Math.round((Media.muted ? 0 : Media.volume) * 100) + "%"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
@@ -452,7 +453,7 @@ Variants {
                                     RowLayout {
                                         x: 0; y: 22; width: parent.width; spacing: 8
                                         IconButton { glyph: modelData.audio.muted ? "\ueee8" : "\uf028"; size: 28; iconSize: 12; onClicked: modelData.audio.muted = !modelData.audio.muted }
-                                        Slider { Layout.fillWidth: true; value: modelData.audio.volume; volumeSlider: true; onMoved: v => modelData.audio.volume = v }
+                                        Slider { Layout.fillWidth: true; value: modelData.audio.muted ? 0 : modelData.audio.volume; volumeSlider: true; scaleVolumeSound: true; onMoved: v => { modelData.audio.muted = false; modelData.audio.volume = v; } }
                                     }
                                 }
                             }

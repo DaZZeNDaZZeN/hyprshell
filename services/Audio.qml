@@ -28,39 +28,44 @@ Singleton {
 
     property int activeSliderDrags: 0
     property double suppressAutoSoundUntil: 0
+    property real pendingSoundScale: 1.0
 
     Process {
         id: volSoundProc
-        command: ["pw-play", root.volumeSound]
+        command: ["pw-play", "--volume", "1.000", root.volumeSound]
     }
     Timer {
         id: volSoundTimer
         interval: 45
         onTriggered: {
             if (!Osd.armed || root.muted || root.activeSliderDrags > 0) return;
-            root.playVolumeSoundNow();
+            root.playVolumeSoundNow(root.pendingSoundScale);
         }
     }
-    function playVolumeSoundNow() {
+    function playVolumeSoundNow(scale) {
         if (!Osd.armed || root.muted) return;
+        const s = (scale === undefined || scale === null || !isFinite(scale)) ? 1.0 : Math.max(0, Math.min(1, scale));
+        if (s <= 0.001) return;
         if (volSoundProc.running) volSoundProc.running = false;
+        volSoundProc.command = ["pw-play", "--volume", s.toFixed(3), root.volumeSound];
         volSoundProc.running = true;
     }
-    function playVolumeSound() {
+    function playVolumeSound(scale) {
         if (!Osd.armed || root.muted) return;
         if (activeSliderDrags > 0 || Date.now() < suppressAutoSoundUntil) return;
+        pendingSoundScale = (scale === undefined || scale === null || !isFinite(scale)) ? 1.0 : Math.max(0, Math.min(1, scale));
         volSoundTimer.restart();
     }
     function beginSliderDrag() {
         activeSliderDrags = Math.max(0, activeSliderDrags) + 1;
         volSoundTimer.stop();
     }
-    function endSliderDrag(playOnRelease) {
+    function endSliderDrag(playOnRelease, scale) {
         activeSliderDrags = Math.max(0, activeSliderDrags - 1);
         suppressAutoSoundUntil = Date.now() + 200;
         volSoundTimer.stop();
         if (playOnRelease && activeSliderDrags === 0) {
-            playVolumeSoundNow();
+            playVolumeSoundNow(scale);
         }
     }
 

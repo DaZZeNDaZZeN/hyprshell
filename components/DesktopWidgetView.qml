@@ -56,6 +56,7 @@ Item {
         property real max: 1
         property int trackHeight: 7
         property bool volumeSlider: false
+        property bool scaleVolumeSound: false
         signal moved(real value)
         signal released()
         implicitHeight: 20
@@ -91,7 +92,11 @@ Item {
             enabled: !root.editMode
             cursorShape: Qt.PointingHandCursor
             property bool dragging: false
-            function upd(m) { sl.moved(Math.max(0, Math.min(1, m.x / Math.max(1, width))) * sl.max); }
+            property real lastVal: sl.value
+            function upd(m) {
+                lastVal = Math.max(0, Math.min(1, m.x / Math.max(1, width))) * sl.max;
+                sl.moved(lastVal);
+            }
             onPressed: m => {
                 if (sl.volumeSlider && !dragging) {
                     dragging = true;
@@ -103,7 +108,7 @@ Item {
             onReleased: {
                 if (dragging) {
                     dragging = false;
-                    Audio.endSliderDrag(true);
+                    Audio.endSliderDrag(true, sl.scaleVolumeSound ? lastVal : 1.0);
                 }
                 sl.released();
             }
@@ -120,8 +125,9 @@ Item {
                 }
             }
             onWheel: w => {
-                sl.moved(Math.max(0, Math.min(sl.max, sl.value + (w.angleDelta.y > 0 ? 0.04 : -0.04) * sl.max)));
-                if (sl.volumeSlider) Audio.playVolumeSound();
+                const nextVal = Math.max(0, Math.min(sl.max, sl.value + (w.angleDelta.y > 0 ? 0.04 : -0.04) * sl.max));
+                sl.moved(nextVal);
+                if (sl.volumeSlider) Audio.playVolumeSound(sl.scaleVolumeSound ? nextVal : 1.0);
             }
         }
     }
@@ -647,6 +653,7 @@ Item {
                         Layout.fillWidth: true
                         value: Media.muted ? 0 : Media.volume
                         volumeSlider: true
+                        scaleVolumeSound: Media.hasOwnVolume
                         onMoved: v => Media.setVolume(v)
                     }
                     Label {
@@ -1119,6 +1126,7 @@ Item {
                                             implicitHeight: 16
                                             value: sinkRow.devMute ? 0 : sinkRow.devVol
                                             volumeSlider: true
+                                            scaleVolumeSound: !sinkRow.isDefault
                                             onMoved: v => {
                                                 if (sinkRow.modelData?.audio) {
                                                     sinkRow.modelData.audio.muted = false;
@@ -1266,6 +1274,7 @@ Item {
                                             implicitHeight: 16
                                             value: appStreamRow.appMute ? 0 : appStreamRow.appVol
                                             volumeSlider: true
+                                            scaleVolumeSound: true
                                             onMoved: v => {
                                                 if (appStreamRow.modelData?.audio) {
                                                     appStreamRow.modelData.audio.muted = false;
