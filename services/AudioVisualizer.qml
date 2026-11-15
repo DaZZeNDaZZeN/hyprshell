@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Pipewire
 import QtQuick
 import qs.config
 import qs.services
@@ -11,6 +12,11 @@ Singleton {
     id: root
     property int users: 0
     readonly property bool active: users > 0 && (Config.o.widgetsEnabled || Panels.active === "widgeteditor")
+    readonly property bool hasEasyEffectsSink: Audio.sinks.some(s => s && (s.name === "easyeffects_sink" || s.name === "easyeffects_sink.monitor"))
+        || Pipewire.nodes.values.some(n => n && (n.name === "easyeffects_sink" || n.name === "easyeffects_sink.monitor"))
+    readonly property string monitorSource: hasEasyEffectsSink
+        ? "easyeffects_sink.monitor"
+        : (Audio.sink?.name ? (Audio.sink.name + ".monitor") : "")
     property var bands: [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -18,10 +24,19 @@ Singleton {
     property real _lastRealUpdate: 0
     property real _phase: 0
 
+    onMonitorSourceChanged: {
+        if (root.active && visProc.running) {
+            visProc.running = false;
+            visProc.running = true;
+        }
+    }
+
     Process {
         id: visProc
         running: root.active
-        command: ["python3", Quickshell.shellDir + "/scripts/visualizer.py"]
+        command: root.monitorSource
+            ? ["python3", Quickshell.shellDir + "/scripts/visualizer.py", root.monitorSource]
+            : ["python3", Quickshell.shellDir + "/scripts/visualizer.py"]
         stdout: SplitParser {
             onRead: line => {
                 try {

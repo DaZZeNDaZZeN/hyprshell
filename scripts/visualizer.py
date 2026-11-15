@@ -23,21 +23,60 @@ BYTES_PER_CHUNK = CHUNK * 2
 NUM_BANDS = 32
 
 
-def get_monitor_source():
+def has_easyeffects_monitor():
+    try:
+        sources = subprocess.check_output(
+            ["pactl", "list", "short", "sources"], text=True, stderr=subprocess.DEVNULL, timeout=2
+        )
+        for line in sources.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2 and parts[1].strip() == "easyeffects_sink.monitor":
+                return True
+    except Exception:
+        pass
+    try:
+        sinks = subprocess.check_output(
+            ["pactl", "list", "short", "sinks"], text=True, stderr=subprocess.DEVNULL, timeout=2
+        )
+        for line in sinks.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2 and parts[1].strip() == "easyeffects_sink":
+                return True
+    except Exception:
+        pass
+    try:
+        pw_nodes = subprocess.check_output(
+            ["pw-cli", "list-objects", "Node"], text=True, stderr=subprocess.DEVNULL, timeout=2
+        )
+        if '"easyeffects_sink"' in pw_nodes or '"easyeffects_sink.monitor"' in pw_nodes:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def get_monitor_source(preferred=None):
+    if preferred == "easyeffects_sink.monitor" or has_easyeffects_monitor():
+        return "easyeffects_sink.monitor"
+    if preferred:
+        return preferred
     try:
         out = subprocess.check_output(
             ["pactl", "get-default-sink"], text=True, stderr=subprocess.DEVNULL, timeout=2
         ).strip()
         if out:
-            return out + ".monitor"
+            return out if out.endswith(".monitor") else (out + ".monitor")
     except Exception:
         pass
     return "@DEFAULT_MONITOR@"
 
 
 def start_capture(source):
+    pw_target = source[:-8] if source.endswith(".monitor") else source
     for cmd in (
         ["parec", "--raw", "--format=s16le", f"--rate={RATE}", "--channels=1", "--latency-msec=30", "-d", source],
+        ["pw-cat", "--record", "--raw", "--format=s16", f"--rate={RATE}", "--channels=1", "--latency=30ms", "--target", source, "-P", "stream.capture.sink=true", "-"],
+        ["pw-cat", "--record", "--raw", "--format=s16", f"--rate={RATE}", "--channels=1", "--latency=30ms", "--target", pw_target, "-P", "stream.capture.sink=true", "-"],
         ["pw-cat", "--record", "--raw", "--format=s16", f"--rate={RATE}", "--channels=1", "--latency=30ms", "-"],
     ):
         try:
@@ -104,7 +143,8 @@ def main():
         window = None
         bin_edges = None
 
-    source = get_monitor_source()
+    preferred = sys.argv[1].strip() if len(sys.argv) > 1 and sys.argv[1].strip() else None
+    source = get_monitor_source(preferred)
     proc = start_capture(source)
     if not proc or not proc.stdout:
         sys.exit(1)
@@ -119,6 +159,23 @@ def main():
 
     try:
         while True:
+            now = time.monotonic()
+            if now - last_sink_check > 3.0:
+                last_sink_check = now
+                new_src = get_monitor_source(preferred)
+                if new_src != source:
+                    source = new_src
+                    buf = b""
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    proc = start_capture(source)
+                    if not proc or not proc.stdout:
+                        break
+                    fd = proc.stdout.fileno()
+                    os.set_blocking(fd, False)
+
             r, _, _ = select.select([fd], [], [], 0.04)
             if r:
                 try:
@@ -128,7 +185,7 @@ def main():
                 if not chunk:
                     time.sleep(0.1)
                     if proc.poll() is not None:
-                        source = get_monitor_source()
+                        source = get_monitor_source(preferred)
                         proc = start_capture(source)
                         if not proc or not proc.stdout:
                             break
@@ -147,21 +204,6 @@ def main():
                     continue
             else:
                 target = [0.0] * NUM_BANDS
-                now = time.monotonic()
-                if now - last_sink_check > 5.0:
-                    last_sink_check = now
-                    new_src = get_monitor_source()
-                    if new_src != source:
-                        source = new_src
-                        try:
-                            proc.terminate()
-                        except Exception:
-                            pass
-                        proc = start_capture(source)
-                        if not proc or not proc.stdout:
-                            break
-                        fd = proc.stdout.fileno()
-                        os.set_blocking(fd, False)
 
             max_v = 0.0
             for i in range(NUM_BANDS):
