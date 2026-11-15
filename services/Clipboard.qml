@@ -6,12 +6,16 @@ import QtQuick
 import qs.config
 
 // Text and image clipboard history. Watches the Wayland clipboard with wl-paste + clip-watch.sh.
+// Persists encrypted in KWallet when available; otherwise keeps entries strictly in RAM.
 Singleton {
     id: root
     property var entries: []        // [{type: "text"|"image", text, image, pinned, time}]
     property bool loaded: false
-    readonly property string store: Config.dir + "/clipboard.json"
+    property string backend: "ram"  // "kwallet" | "ram"
+    readonly property string ramDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/dev/shm/hyprshell-" + (Quickshell.env("USER") || "user"))) + "/hyprshell"
+    readonly property string stagingPath: ramDir + "/.clip-staging.json"
     readonly property string watchScript: Qt.resolvedUrl("../scripts/clip-watch.sh").toString().replace("file://", "")
+    readonly property string storeScript: Qt.resolvedUrl("../scripts/clip-store.sh").toString().replace("file://", "")
 
     function decodeEscapedUnicode(s) {
         if (!s || !/\\u[0-9a-fA-F]{4}/.test(s)) return s;
@@ -23,34 +27,70 @@ Singleton {
     }
 
     FileView {
-        id: file
-        path: root.store
+        id: stagingFile
+        path: root.stagingPath
         printErrors: false
-        onLoaded: {
-            try {
-                const raw = JSON.parse(text());
-                root.entries = raw.filter(e => {
-                    if (!e) return false;
-                    if (e.type === "image") return !!e.image;
-                    if (!e.text || !e.text.trim()) return false;
-                    if (e.text.startsWith("\u0089PNG") || e.text.includes("\ufffd")) return false;
-                    if (/^<meta http-equiv="content-type".*<img /.test(e.text)) return false;
-                    return true;
-                }).map(e => ({
-                    type: e.type || (e.image ? "image" : "text"),
-                    text: root.decodeEscapedUnicode(e.text || ""),
-                    image: e.image || "",
-                    pinned: !!e.pinned,
-                    time: e.time || Date.now()
-                }));
-            } catch (e) {}
-            root.loaded = true;
+    }
+
+    Process {
+        id: loadProc
+        running: true
+        command: ["bash", root.storeScript, "load"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const res = JSON.parse(text.trim());
+                    if (res && res.backend) root.backend = res.backend;
+                    const raw = (res && Array.isArray(res.entries)) ? res.entries : [];
+                    root.entries = raw.filter(e => {
+                        if (!e) return false;
+                        if (e.type === "image") return !!e.image;
+                        if (!e.text || !e.text.trim()) return false;
+                        if (e.text.startsWith("\u0089PNG") || e.text.includes("\ufffd")) return false;
+                        if (/^<meta http-equiv="content-type".*<img /.test(e.text)) return false;
+                        return true;
+                    }).map(e => ({
+                        type: e.type || (e.image ? "image" : "text"),
+                        text: root.decodeEscapedUnicode(e.text || ""),
+                        image: e.image || "",
+                        pinned: !!e.pinned,
+                        time: e.time || Date.now()
+                    }));
+                } catch (e) {}
+                root.loaded = true;
+            }
         }
-        onLoadFailed: {
-            root.loaded = true;
+        onExited: code => {
+            if (!root.loaded) root.loaded = true;
         }
     }
-    function persist() { if (root.loaded) file.setText(JSON.stringify(root.entries)); }
+
+    Process {
+        id: saveProc
+        command: ["bash", root.storeScript, "save"]
+    }
+
+    Timer {
+        id: saveTimer
+        interval: 150
+        onTriggered: {
+            if (!root.loaded || root.backend !== "kwallet") return;
+            stagingFile.setText(JSON.stringify(root.entries));
+            if (saveProc.running) saveProc.running = false;
+            saveProc.running = true;
+        }
+    }
+
+    function persist() {
+        if (!root.loaded || root.backend !== "kwallet") return;
+        saveTimer.restart();
+    }
+
+    function cleanupImageFile(imgPath) {
+        if (!imgPath || !imgPath.startsWith(root.ramDir + "/clip/")) return;
+        if (root.entries.some(e => e.type === "image" && e.image === imgPath)) return;
+        Quickshell.execDetached(["rm", "-f", imgPath]);
+    }
 
     Process {
         id: textWatcher
@@ -84,8 +124,14 @@ Singleton {
         const old = root.entries.find(e => e.type !== "image" && e.text === t);
         let list = root.entries.filter(e => !(e.type !== "image" && e.text === t));
         list.unshift({ type: "text", text: t, image: "", pinned: old ? old.pinned : false, time: Date.now() });
-        const pinned = list.filter(e => e.pinned), rest = list.filter(e => !e.pinned).slice(0, 100);
+        const pinned = list.filter(e => e.pinned);
+        const unpinned = list.filter(e => !e.pinned);
+        const rest = unpinned.slice(0, 100);
+        const evicted = unpinned.slice(100);
         root.entries = pinned.concat(rest).sort((a, b) => (b.pinned - a.pinned) || (b.time - a.time));
+        for (const ev of evicted) {
+            if (ev.type === "image" && ev.image) root.cleanupImageFile(ev.image);
+        }
         persist();
     }
 
@@ -100,8 +146,14 @@ Singleton {
             pinned: old ? old.pinned : false,
             time: Date.now()
         });
-        const pinned = list.filter(e => e.pinned), rest = list.filter(e => !e.pinned).slice(0, 100);
+        const pinned = list.filter(e => e.pinned);
+        const unpinned = list.filter(e => !e.pinned);
+        const rest = unpinned.slice(0, 100);
+        const evicted = unpinned.slice(100);
         root.entries = pinned.concat(rest).sort((a, b) => (b.pinned - a.pinned) || (b.time - a.time));
+        for (const ev of evicted) {
+            if (ev.type === "image" && ev.image) root.cleanupImageFile(ev.image);
+        }
         persist();
     }
 
@@ -116,11 +168,20 @@ Singleton {
         }
         Quickshell.execDetached(["wl-copy", "--", String(t)]);
     }
-    function remove(e) { root.entries = root.entries.filter(x => x !== e); persist(); }
+    function remove(e) {
+        root.entries = root.entries.filter(x => x !== e);
+        if (e && e.type === "image" && e.image) root.cleanupImageFile(e.image);
+        persist();
+    }
     function togglePin(e) {
         e.pinned = !e.pinned;
         root.entries = root.entries.slice().sort((a, b) => (b.pinned - a.pinned) || (b.time - a.time));
         persist();
     }
-    function clear() { root.entries = root.entries.filter(e => e.pinned); persist(); }
+    function clear() {
+        const removed = root.entries.filter(e => !e.pinned && e.type === "image" && e.image);
+        root.entries = root.entries.filter(e => e.pinned);
+        for (const r of removed) root.cleanupImageFile(r.image);
+        persist();
+    }
 }

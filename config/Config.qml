@@ -29,6 +29,11 @@ Singleton {
                 else if (adapter.darkTheme === "none") adapter.darkTheme = adapter.staticTheme;
                 adapter.staticTheme = "none";
             }
+            if (adapter.dockShowLauncher && adapter.dockLauncherPosition === "pinned" && !adapter.dockPinned.includes("@launcher")) {
+                adapter.dockPinned = ["@launcher"].concat(adapter.dockPinned);
+            } else if ((!adapter.dockShowLauncher || adapter.dockLauncherPosition !== "pinned") && adapter.dockPinned.includes("@launcher")) {
+                adapter.dockPinned = adapter.dockPinned.filter(p => p !== "@launcher");
+            }
             root.loaded = true;
         }
         onLoadFailed: error => { writeAdapter(); root.loaded = true; }
@@ -82,6 +87,8 @@ Singleton {
             property bool dockKeepOnEmpty: true
             property int dockIconSize: 44
             property string dockOrder: "workspace"     // workspace | pinned
+            property bool dockShowLauncher: false
+            property string dockLauncherPosition: "pinned" // left | right | pinned
             property var dockPinned: ["firefox", "org.kde.dolphin", "kitty"]
 
             // ---- launcher ----
@@ -123,6 +130,13 @@ Singleton {
             property bool slideshow: false
             property int slideshowMinutes: 30
             property string wallhavenApiKey: ""
+
+            // ---- sliders & media ----
+            property int sliderScrollStep: 3
+            property int mediaSeekStep: 5
+            property bool widgetMediaOverrideScroll: false
+            property int widgetMediaVolumeStep: 3
+            property int widgetMediaSeekStep: 5
 
             // ---- misc ----
             property string terminal: "kitty"

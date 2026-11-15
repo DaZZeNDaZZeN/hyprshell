@@ -3,14 +3,21 @@
 # Reads clipboard data directly from stdin (provided by wl-paste --watch) to avoid recursive wl-paste deadlocks.
 
 set -u
+umask 077
 
 mode="${1:-text}"
 if [ "${CLIPBOARD_STATE:-data}" != "data" ]; then
     exit 0
 fi
 
-cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/hyprshell/clip"
-mkdir -p "$cache_dir"
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then
+    ram_dir="$XDG_RUNTIME_DIR/hyprshell"
+else
+    ram_dir="/dev/shm/hyprshell-$(id -u)"
+fi
+cache_dir="$ram_dir/clip"
+mkdir -p -m 700 "$ram_dir" "$cache_dir"
+chmod 700 "$ram_dir" "$cache_dir" 2>/dev/null || true
 
 if [ "$mode" = "image" ]; then
     tmp="$cache_dir/.tmp-$$.png"

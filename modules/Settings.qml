@@ -218,6 +218,8 @@ Variants {
                     SettingRow { title: "Height"; desc: win.o.barHeight + " px"; Sl { value: win.o.barHeight - 28; max: 24; onMoved: v => win.o.barHeight = Math.round(v) + 28 } }
                     SettingRow { title: "Scroll to change volume"; desc: "Scroll on empty bar space to adjust volume."; Sw { checked: win.o.barScrollVolume; onToggled: v => win.o.barScrollVolume = v } }
                     SettingRow { title: "Scroll volume step"; visible: win.o.barScrollVolume; desc: win.o.barScrollStep + "% when scrolling on empty bar space"; Sl { value: win.o.barScrollStep - 1; max: 19; onMoved: v => win.o.barScrollStep = Math.max(1, Math.round(v + 1)) } }
+                    SettingRow { title: "Slider scroll step"; desc: win.o.sliderScrollStep + "% on scroll for Control Center volume & brightness, Volume Mixer, and Media Player volume"; Sl { value: win.o.sliderScrollStep - 1; max: 24; onMoved: v => win.o.sliderScrollStep = Math.max(1, Math.round(v + 1)) } }
+                    SettingRow { title: "Media seek scroll step"; desc: win.o.mediaSeekStep + " s on scroll for Media Player seek slider"; Sl { value: win.o.mediaSeekStep - 1; max: 59; onMoved: v => win.o.mediaSeekStep = Math.max(1, Math.round(v + 1)) } }
                     SettingRow { title: "Right-click opens Control Center"; desc: "Open Control Center at cursor when right-clicking empty bar space."; Sw { checked: win.o.barRightClickCc; onToggled: v => win.o.barRightClickCc = v } }
                     SettingRow { title: "Monitors"; desc: "Show a bar on every monitor or only the first."; Segmented { options: [{ label: "All", value: "all" }, { label: "Primary", value: "primary" }]; current: win.o.barMonitors; onPicked: v => win.o.barMonitors = v } }
                     Section { text: "Modules" }
@@ -251,6 +253,44 @@ Variants {
                     SettingRow { title: "Opacity"; desc: Math.round(win.o.dockOpacity * 100) + "%"; Sl { value: win.o.dockOpacity - 0.1; max: 0.9; onMoved: v => win.o.dockOpacity = Math.round((v + 0.1) * 100) / 100 } }
                     SettingRow { title: "Icon size"; desc: win.o.dockIconSize + " px"; Sl { value: win.o.dockIconSize - 28; max: 44; onMoved: v => win.o.dockIconSize = Math.round(v) + 28 } }
                     SettingRow {
+                        title: "Launcher button"
+                        desc: "Show an application launcher button in the dock."
+                        Sw {
+                            checked: win.o.dockShowLauncher
+                            onToggled: v => {
+                                win.o.dockShowLauncher = v;
+                                if (v && win.o.dockLauncherPosition === "pinned" && !win.o.dockPinned.includes("@launcher")) {
+                                    win.o.dockPinned = ["@launcher"].concat(win.o.dockPinned);
+                                } else if (!v && win.o.dockPinned.includes("@launcher")) {
+                                    win.o.dockPinned = win.o.dockPinned.filter(p => p !== "@launcher");
+                                }
+                            }
+                        }
+                    }
+                    SettingRow {
+                        visible: win.o.dockShowLauncher
+                        title: "Launcher position"
+                        desc: win.o.dockLauncherPosition === "pinned"
+                            ? "Placed in the pinned apps group (reorder below or drag on dock)"
+                            : (win.o.dockLauncherPosition === "left" ? "Always fixed at the far left of the dock" : "Always fixed at the far right of the dock")
+                        Segmented {
+                            options: [
+                                { label: "Always left", value: "left" },
+                                { label: "In pinned", value: "pinned" },
+                                { label: "Always right", value: "right" }
+                            ]
+                            current: win.o.dockLauncherPosition
+                            onPicked: v => {
+                                win.o.dockLauncherPosition = v;
+                                if (v === "pinned" && win.o.dockShowLauncher && !win.o.dockPinned.includes("@launcher")) {
+                                    win.o.dockPinned = ["@launcher"].concat(win.o.dockPinned);
+                                } else if (v !== "pinned" && win.o.dockPinned.includes("@launcher")) {
+                                    win.o.dockPinned = win.o.dockPinned.filter(p => p !== "@launcher");
+                                }
+                            }
+                        }
+                    }
+                    SettingRow {
                         title: "App ordering"
                         desc: win.o.dockOrder === "pinned"
                             ? "1. Pinned apps  2. Other open apps by opening order (drag any app within its group)"
@@ -271,7 +311,8 @@ Variants {
                             id: pinRow
                             required property var modelData
                             required property int index
-                            readonly property var entry: Apps.lookup(modelData)
+                            readonly property bool isLauncher: modelData === "@launcher"
+                            readonly property var entry: isLauncher ? null : Apps.lookup(modelData)
                             readonly property bool isBeingDragged: dockPage.pinDragFrom === index
                             readonly property real stepH: 52
                             readonly property real shiftY: {
@@ -301,14 +342,27 @@ Variants {
                                     tint: dragMa.containsMouse || pinRow.isBeingDragged ? Theme.accent : Theme.subtext
                                 }
                                 Image {
+                                    visible: !pinRow.isLauncher
                                     width: 28; height: 28
                                     sourceSize: Qt.size(56, 56)
-                                    source: Apps.iconFor(pinRow.entry?.icon ?? pinRow.modelData)
+                                    source: pinRow.isLauncher ? "" : Apps.iconFor(pinRow.entry?.icon ?? pinRow.modelData)
+                                }
+                                Rectangle {
+                                    visible: pinRow.isLauncher
+                                    width: 28; height: 28; radius: 7
+                                    color: Theme.surface3
+                                    border.width: 1; border.color: Theme.border
+                                    Icon {
+                                        anchors.centerIn: parent
+                                        text: "\uf00a"
+                                        font.pixelSize: 13
+                                        tint: Theme.accent
+                                    }
                                 }
                                 Column {
                                     Layout.fillWidth: true
-                                    Label { text: pinRow.entry ? pinRow.entry.name : pinRow.modelData; font.weight: Font.Medium }
-                                    Label { text: pinRow.modelData; color: Theme.subtext; font.pixelSize: Theme.fsS }
+                                    Label { text: pinRow.isLauncher ? "App Launcher" : (pinRow.entry ? pinRow.entry.name : pinRow.modelData); font.weight: Font.Medium }
+                                    Label { text: pinRow.isLauncher ? "Built-in launcher button" : pinRow.modelData; color: Theme.subtext; font.pixelSize: Theme.fsS }
                                 }
                                 IconButton {
                                     glyph: "\uf077"
@@ -325,7 +379,10 @@ Variants {
                                 Button {
                                     text: "Remove"
                                     danger: true
-                                    onClicked: win.o.dockPinned = win.o.dockPinned.filter(p => p !== pinRow.modelData)
+                                    onClicked: {
+                                        if (pinRow.isLauncher) win.o.dockShowLauncher = false;
+                                        win.o.dockPinned = win.o.dockPinned.filter(p => p !== pinRow.modelData);
+                                    }
                                 }
                             }
 
@@ -514,6 +571,25 @@ Variants {
                         }
                     }
 
+                    Section { text: "Media player widget options" }
+                    SettingRow {
+                        title: "Override scroll steps"
+                        desc: "Use custom volume and seek scroll steps for desktop Media Player widgets."
+                        Sw { checked: win.o.widgetMediaOverrideScroll; onToggled: v => win.o.widgetMediaOverrideScroll = v }
+                    }
+                    SettingRow {
+                        visible: win.o.widgetMediaOverrideScroll
+                        title: "Widget volume scroll step"
+                        desc: win.o.widgetMediaVolumeStep + "% when scrolling on the desktop widget Media Player volume slider"
+                        Sl { value: win.o.widgetMediaVolumeStep - 1; max: 24; onMoved: v => win.o.widgetMediaVolumeStep = Math.max(1, Math.round(v + 1)) }
+                    }
+                    SettingRow {
+                        visible: win.o.widgetMediaOverrideScroll
+                        title: "Widget seek scroll step"
+                        desc: win.o.widgetMediaSeekStep + " s when scrolling on the desktop widget Media Player seek slider"
+                        Sl { value: win.o.widgetMediaSeekStep - 1; max: 59; onMoved: v => win.o.widgetMediaSeekStep = Math.max(1, Math.round(v + 1)) }
+                    }
+
                     Section { text: "Weather widget options" }
                     SettingRow { title: "City"; desc: "Leave empty to detect automatically."; TextField { width: 220; text: win.o.weatherCity; onAccepted: win.o.weatherCity = text } }
                     SettingRow { title: "Fahrenheit"; Sw { checked: win.o.weatherFahrenheit; onToggled: v => win.o.weatherFahrenheit = v } }
@@ -566,6 +642,9 @@ Variants {
                 // ================= System =================
                 Page {
                     key: "system"
+                    Section { text: "Sliders & media" }
+                    SettingRow { title: "Slider scroll step"; desc: win.o.sliderScrollStep + "% on scroll for Control Center volume & brightness, Volume Mixer, and Media Player volume"; Sl { value: win.o.sliderScrollStep - 1; max: 24; onMoved: v => win.o.sliderScrollStep = Math.max(1, Math.round(v + 1)) } }
+                    SettingRow { title: "Media seek scroll step"; desc: win.o.mediaSeekStep + " s on scroll for Media Player seek slider"; Sl { value: win.o.mediaSeekStep - 1; max: 59; onMoved: v => win.o.mediaSeekStep = Math.max(1, Math.round(v + 1)) } }
                     Section { text: "Default apps" }
                     SettingRow { title: "Terminal"; TextField { width: 200; text: win.o.terminal; onAccepted: win.o.terminal = text } }
                     SettingRow { title: "Browser"; TextField { width: 200; text: win.o.browser; onAccepted: win.o.browser = text } }

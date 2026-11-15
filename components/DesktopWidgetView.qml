@@ -55,10 +55,13 @@ Item {
         property real value: 0
         property real max: 1
         property int trackHeight: 7
+        property real step: (Config.o.sliderScrollStep || 3) / 100
+        property bool customScroll: false
         property bool volumeSlider: false
         property bool scaleVolumeSound: false
         signal moved(real value)
         signal released()
+        signal scrolled(int dir)
         implicitHeight: 20
         implicitWidth: 120
         readonly property real frac: Math.max(0, Math.min(1, max > 0 ? value / max : 0))
@@ -125,7 +128,14 @@ Item {
                 }
             }
             onWheel: w => {
-                const nextVal = Math.max(0, Math.min(sl.max, sl.value + (w.angleDelta.y > 0 ? 0.04 : -0.04) * sl.max));
+                const dir = w.angleDelta.y > 0 ? 1 : (w.angleDelta.y < 0 ? -1 : 0);
+                if (dir === 0) return;
+                if (sl.customScroll) {
+                    sl.scrolled(dir);
+                    return;
+                }
+                const stepFrac = sl.step > 0 ? sl.step : ((Config.o.sliderScrollStep || 3) / 100);
+                const nextVal = Math.max(0, Math.min(sl.max, sl.value + dir * stepFrac * sl.max));
                 sl.moved(nextVal);
                 if (sl.volumeSlider) Audio.playVolumeSound(sl.scaleVolumeSound ? nextVal : 1.0);
             }
@@ -510,6 +520,12 @@ Item {
             readonly property bool showSeek: root.widget?.showSeek !== false
             readonly property bool showVol: root.widget?.showVolume !== false
             readonly property bool showPager: (root.widget?.showPlayerSelector !== false) && Media.count > 1
+            readonly property int effVolStep: (root.widget?.volumeScrollStep ?? -1) > 0
+                ? root.widget.volumeScrollStep
+                : (Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaVolumeStep || 3) : (Config.o.sliderScrollStep || 3))
+            readonly property int effSeekStep: (root.widget?.seekScrollStep ?? -1) > 0
+                ? root.widget.seekScrollStep
+                : (Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaSeekStep || 5) : (Config.o.mediaSeekStep || 5))
 
             ColumnLayout {
                 anchors.fill: parent
@@ -633,7 +649,9 @@ Item {
                         Layout.fillWidth: true
                         opacity: Media.length > 0 ? 1 : 0.45
                         value: Media.length > 0 ? Media.position / Media.length : 0
+                        customScroll: true
                         onMoved: v => Media.seekRatio(v)
+                        onScrolled: dir => Media.seekBy(dir * mediaRoot.effSeekStep)
                     }
                     Label { text: Media.formatTime(Media.length); font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 30 }
                 }
@@ -652,6 +670,7 @@ Item {
                     WidgetSlider {
                         Layout.fillWidth: true
                         value: Media.muted ? 0 : Media.volume
+                        step: mediaRoot.effVolStep / 100
                         volumeSlider: true
                         scaleVolumeSound: Media.hasOwnVolume
                         onMoved: v => Media.setVolume(v)

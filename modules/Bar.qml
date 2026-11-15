@@ -592,7 +592,9 @@ Variants {
                         implicitHeight: 20
                         opacity: Media.length > 0 ? 1 : 0.45
                         value: mediaPopup.visible && Media.length > 0 ? Media.position / Media.length : 0
+                        customScroll: true
                         onMoved: v => Media.seekRatio(v)
+                        onScrolled: dir => Media.seekBy(dir * (Config.o.mediaSeekStep || 5))
                     }
                     Label {
                         text: mediaPopup.visible ? Media.formatTime(Media.length) : "0:00"

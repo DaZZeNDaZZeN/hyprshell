@@ -149,9 +149,20 @@ Singleton {
         }
     }
 
+    property bool seekPending: false
+    Timer {
+        id: seekPendingTimer
+        interval: 900
+        repeat: false
+        onTriggered: root.seekPending = false
+    }
+
     readonly property real length: rawLength > 0 ? rawLength : ((trackKey && trackLengths[trackKey] > 0) ? trackLengths[trackKey] : 0)
     readonly property real position: {
         if (!player) return 0;
+        if (seekPending && fallbackTrackKey === trackKey && fallbackPosition >= 0) {
+            return length > 0 ? Math.min(length, fallbackPosition) : fallbackPosition;
+        }
         const reported = (player.positionSupported && player.position > 0) ? player.position : -1;
         const rawPos = reported >= 0
             ? reported
@@ -239,6 +250,8 @@ Singleton {
         const target = Math.max(0, Math.min(length, r * length));
         fallbackTrackKey = trackKey;
         fallbackPosition = target;
+        seekPending = true;
+        seekPendingTimer.restart();
         if (player.canSeek) {
             if (player.positionSupported && player.lengthSupported) {
                 player.position = target;
@@ -257,6 +270,15 @@ Singleton {
             } else {
                 player.position = target;
             }
+        }
+    }
+
+    function seekBy(sec) {
+        if (!player || !sec) return;
+        if (length > 0) {
+            seekRatio((position + sec) / length);
+        } else if (player.canSeek && typeof player.seek === "function") {
+            player.seek(sec);
         }
     }
 

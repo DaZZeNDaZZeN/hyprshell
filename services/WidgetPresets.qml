@@ -145,7 +145,9 @@ Singleton {
                 showSeek: true,
                 showVolume: true,
                 showPlayerSelector: true,
-                hideWhenIdle: true
+                hideWhenIdle: true,
+                volumeScrollStep: -1,
+                seekScrollStep: -1
             }
         ];
     }
@@ -210,7 +212,9 @@ Singleton {
                 showSeek: true,
                 showVolume: true,
                 showPlayerSelector: true,
-                hideWhenIdle: false
+                hideWhenIdle: false,
+                volumeScrollStep: -1,
+                seekScrollStep: -1
             });
         }
         if (type === "visualizer") {

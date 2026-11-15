@@ -19,7 +19,14 @@ Variants {
         name: "controlcenter"
         scrimOpacity: 0.12
         property string page: "main"
-        onOpenChanged: if (open) { page = Panels.page || "main"; Network.wanted = true; Network.refresh(); } else Network.wanted = false
+        property real anchorX: -1
+        Connections {
+            target: Panels
+            function onAnchorXChanged() {
+                if (Panels.active === "controlcenter") win.anchorX = Panels.anchorX;
+            }
+        }
+        onOpenChanged: if (open) { anchorX = Panels.anchorX; page = Panels.page || "main"; Network.wanted = true; Network.refresh(); } else Network.wanted = false
 
         component Tile: Rectangle {
             id: t
@@ -93,8 +100,8 @@ Variants {
             width: 396
             height: win.page === "main" ? mainCol.implicitHeight + 32 : 520
             Behavior on height { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutQuint } }
-            x: Panels.anchorX >= 0
-                ? Math.max(10, Math.min(parent.width - width - 10, Math.round(Panels.anchorX - width / 2)))
+            x: win.anchorX >= 0
+                ? Math.max(10, Math.min(parent.width - width - 10, Math.round(win.anchorX - width / 2)))
                 : parent.width - width - 10
             y: Config.o.barEnabled && Config.o.barPosition === "bottom"
                 ? parent.height - height - (Config.o.barHeight + 16)
@@ -259,7 +266,9 @@ Variants {
                                     implicitHeight: 20
                                     opacity: Media.length > 0 ? 1 : 0.45
                                     value: win.visible && Media.length > 0 ? Media.position / Media.length : 0
+                                    customScroll: true
                                     onMoved: v => Media.seekRatio(v)
+                                    onScrolled: dir => Media.seekBy(dir * (Config.o.mediaSeekStep || 5))
                                 }
                                 Label { text: win.visible ? Media.formatTime(Media.length) : "0:00"; font.pixelSize: Theme.fsS; color: Theme.subtext; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 32 }
                             }

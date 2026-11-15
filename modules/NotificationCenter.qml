@@ -44,18 +44,34 @@ Variants {
                         IconButton { glyph: "\uf1f8"; size: 32; iconSize: 13; baseColor: Theme.surface2; onClicked: Notifs.clearAll() }
                     }
                 }
-                ListView {
+                Flickable {
                     id: list
                     Layout.fillWidth: true; Layout.fillHeight: true
-                    clip: true; spacing: 8
-                    model: ScriptModel {
-                        values: win.visible ? Notifs.items : []
-                    }
+                    contentWidth: width
+                    contentHeight: notifCol.implicitHeight
+                    clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    delegate: NotifCard { required property var modelData; notif: modelData; width: list.width }
-                    add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.anim } }
-                    remove: Transition { NumberAnimation { property: "opacity"; to: 0; duration: Theme.animFast } }
-                    displaced: Transition { NumberAnimation { properties: "y"; duration: Theme.anim; easing.type: Easing.OutCubic } }
+                    onContentHeightChanged: {
+                        const maxY = Math.max(0, contentHeight - height);
+                        if (contentY > maxY) contentY = maxY;
+                    }
+
+                    Column {
+                        id: notifCol
+                        width: list.width
+                        spacing: 8
+                        Repeater {
+                            model: ScriptModel {
+                                values: Notifs.items
+                            }
+                            delegate: NotifCard {
+                                required property var modelData
+                                notif: modelData
+                                width: notifCol.width
+                            }
+                        }
+                    }
+
                     Column {
                         anchors.centerIn: parent; spacing: 10; visible: Notifs.count === 0
                         Icon { anchors.horizontalCenter: parent.horizontalCenter; text: "\uf1f6"; font.pixelSize: 40; tint: Theme.subtext; opacity: 0.5 }

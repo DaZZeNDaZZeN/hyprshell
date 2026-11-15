@@ -27,7 +27,7 @@ Singleton {
     }
     property real anchorX: -1
     function open(name, page) {
-        anchorX = -1;
+        if (name === "controlcenter") anchorX = -1;
         screenName = focusedScreen();
         root.page = page ?? "";
         active = name;

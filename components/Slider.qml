@@ -8,10 +8,13 @@ Item {
     property real value: 0
     property real max: 1
     property int trackHeight: 8
+    property real step: (Config.o.sliderScrollStep || 3) / 100
+    property bool customScroll: false
     property bool volumeSlider: false
     property bool scaleVolumeSound: false
     signal moved(real value)
     signal released()
+    signal scrolled(int dir)
     implicitHeight: 24
     implicitWidth: 160
 
@@ -80,7 +83,14 @@ Item {
             }
         }
         onWheel: w => {
-            const nextVal = Math.max(0, Math.min(root.max, root.value + (w.angleDelta.y > 0 ? 0.03 : -0.03) * root.max));
+            const dir = w.angleDelta.y > 0 ? 1 : (w.angleDelta.y < 0 ? -1 : 0);
+            if (dir === 0) return;
+            if (root.customScroll) {
+                root.scrolled(dir);
+                return;
+            }
+            const stepFrac = root.step > 0 ? root.step : ((Config.o.sliderScrollStep || 3) / 100);
+            const nextVal = Math.max(0, Math.min(root.max, root.value + dir * stepFrac * root.max));
             root.moved(nextVal);
             if (root.volumeSlider) Audio.playVolumeSound(root.scaleVolumeSound ? nextVal : 1.0);
         }

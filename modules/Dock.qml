@@ -47,7 +47,18 @@ Variants {
         mask: Region { item: win.hidden ? trigger : maskItem }
 
         function canonId(id) {
+            if (id === "@launcher") return "@launcher";
             return (Apps.lookup(id)?.id ?? id ?? "").toLowerCase();
+        }
+
+        readonly property string launcherPos: Config.o.dockLauncherPosition || "pinned"
+        readonly property var effectivePinned: {
+            const raw = Config.o.dockPinned ? Config.o.dockPinned.slice() : [];
+            if (Config.o.dockShowLauncher && win.launcherPos === "pinned") {
+                if (!raw.includes("@launcher")) raw.unshift("@launcher");
+                return raw;
+            }
+            return raw.filter(p => p !== "@launcher");
         }
 
         function syncOpenOrder() {
@@ -79,9 +90,11 @@ Variants {
             const hyprTops = Hyprland.toplevels.values;
             const orderMode = Config.o.dockOrder;
             const openOrd = win.openOrder;
-            const list = Config.o.dockPinned.map((p, idx) => ({
+            const list = win.effectivePinned.map((p, idx) => ({
                 id: p,
                 key: canonId(p),
+                isLauncher: p === "@launcher",
+                fixedSide: "",
                 pinned: true,
                 pinIdx: idx,
                 openIdx: -1,
@@ -155,29 +168,47 @@ Variants {
                 });
             }
 
+            if (Config.o.dockShowLauncher && win.launcherPos !== "pinned") {
+                const fixedEntry = {
+                    id: "@launcher",
+                    key: "@launcher",
+                    isLauncher: true,
+                    fixedSide: win.launcherPos,
+                    pinned: false,
+                    pinIdx: win.launcherPos === "left" ? -1 : 999999,
+                    openIdx: -1,
+                    tops: [],
+                    minWs: Infinity,
+                    minX: Infinity,
+                    minY: Infinity
+                };
+                if (win.launcherPos === "left") list.unshift(fixedEntry);
+                else list.push(fixedEntry);
+            }
+
             return list;
         }
 
         function canDragEntry(idx) {
             const e = entries[idx];
-            if (!e) return false;
+            if (!e || e.fixedSide) return false;
             if (Config.o.dockOrder === "pinned") return true;
             return e.pinned && e.tops.length === 0;
         }
 
         function dragGroupBounds(idx) {
             const e = entries[idx];
-            if (!e) return { min: idx, max: idx };
+            if (!e || e.fixedSide) return { min: idx, max: idx };
             if (Config.o.dockOrder === "pinned") {
                 let min = idx, max = idx;
-                while (min > 0 && entries[min - 1].pinned === e.pinned) min--;
-                while (max < entries.length - 1 && entries[max + 1].pinned === e.pinned) max++;
+                while (min > 0 && !entries[min - 1].fixedSide && entries[min - 1].pinned === e.pinned) min--;
+                while (max < entries.length - 1 && !entries[max + 1].fixedSide && entries[max + 1].pinned === e.pinned) max++;
                 return { min: min, max: max };
             } else {
                 // In "workspace" mode, only closed pinned apps (Group 2) can be dragged
                 let min = idx, max = idx;
-                while (min > 0 && entries[min - 1].pinned && entries[min - 1].tops.length === 0) min--;
-                while (max < entries.length - 1 && entries[max + 1].pinned && entries[max + 1].tops.length === 0) max++;
+                while (min > 0 && !entries[min - 1].fixedSide && entries[min - 1].pinned && entries[min - 1].tops.length === 0) min--;
+                while (max < entries.length - 1 && !entries[max + 1].fixedSide && entries[max + 1].pinned && entries[max + 1].tops.length === 0) max++;
                 return { min: min, max: max };
             }
         }
@@ -185,14 +216,17 @@ Variants {
         function commitReorder(fromIdx, toIdx) {
             if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= entries.length || toIdx >= entries.length) return;
             const moved = entries[fromIdx];
-            if (!moved) return;
+            if (!moved || moved.fixedSide) return;
 
             if (Config.o.dockOrder === "pinned") {
                 if (moved.pinned) {
-                    const pinned = Config.o.dockPinned.slice();
-                    if (fromIdx < pinned.length && toIdx < pinned.length) {
-                        const [item] = pinned.splice(fromIdx, 1);
-                        pinned.splice(toIdx, 0, item);
+                    const bounds = dragGroupBounds(fromIdx);
+                    const pinned = win.effectivePinned.slice();
+                    const localFrom = fromIdx - bounds.min;
+                    const localTo = toIdx - bounds.min;
+                    if (localFrom >= 0 && localFrom < pinned.length && localTo >= 0 && localTo < pinned.length) {
+                        const [item] = pinned.splice(localFrom, 1);
+                        pinned.splice(localTo, 0, item);
                         Config.o.dockPinned = pinned;
                     }
                 } else {
@@ -221,7 +255,7 @@ Variants {
                 const closedKeySet = {};
                 for (const ce of closedEntries) closedKeySet[ce.key] = true;
 
-                const pinned = Config.o.dockPinned.slice();
+                const pinned = win.effectivePinned.slice();
                 let ci = 0;
                 for (let i = 0; i < pinned.length; i++) {
                     const pk = canonId(pinned[i]);
@@ -233,8 +267,13 @@ Variants {
             }
         }
         function togglePin(e) {
-            const cur = Config.o.dockPinned.slice();
-            const i = cur.findIndex(p => (Apps.lookup(p)?.id ?? p).toLowerCase() === e.key);
+            if (e.isLauncher) {
+                Config.o.dockShowLauncher = false;
+                Config.o.dockPinned = Config.o.dockPinned.filter(p => p !== "@launcher");
+                return;
+            }
+            const cur = win.effectivePinned.slice();
+            const i = cur.findIndex(p => canonId(p) === e.key);
             if (i >= 0) cur.splice(i, 1); else cur.push(e.id);
             Config.o.dockPinned = cur;
         }
@@ -398,10 +437,11 @@ Variants {
                         id: item
                         required property var modelData
                         required property int index
-                        readonly property var entry: Apps.lookup(modelData.id)
+                        readonly property bool isLauncher: !!modelData.isLauncher
+                        readonly property var entry: isLauncher ? null : Apps.lookup(modelData.id)
                         readonly property int winCount: modelData.tops.length
                         readonly property bool running: winCount > 0
-                        readonly property bool focused: running && modelData.tops.some(t => t.activated)
+                        readonly property bool focused: isLauncher ? (Panels.active === "launcher") : (running && modelData.tops.some(t => t.activated))
                         readonly property bool isBeingDragged: win.dragFromIdx === index
                         readonly property real stepW: width + row.spacing
                         readonly property real shiftX: {
@@ -424,15 +464,37 @@ Variants {
                         }
                         Image {
                             id: icon
+                            visible: !item.isLauncher
                             anchors.horizontalCenter: parent.horizontalCenter
                             y: ma.containsMouse || item.isBeingDragged ? -4 : 0
                             width: win.isz; height: win.isz
                             sourceSize: Qt.size(win.isz * 2, win.isz * 2)
-                            source: Apps.iconFor(entry?.icon ?? modelData.id)
+                            source: item.isLauncher ? "" : Apps.iconFor(entry?.icon ?? modelData.id)
                             smooth: true
                             scale: item.isBeingDragged ? 1.16 : (ma.pressed ? 0.88 : (ma.containsMouse ? 1.15 : 1))
                             Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
                             Behavior on y { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
+                        }
+                        Rectangle {
+                            id: launcherTile
+                            visible: item.isLauncher
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: ma.containsMouse || item.isBeingDragged ? -4 : 0
+                            width: win.isz; height: win.isz
+                            radius: Math.round(win.isz * 0.26)
+                            color: item.focused ? Theme.accent : Theme.surface3
+                            border.width: 1
+                            border.color: item.focused ? Theme.accent : Theme.border
+                            scale: item.isBeingDragged ? 1.16 : (ma.pressed ? 0.88 : (ma.containsMouse ? 1.15 : 1))
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                            Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
+                            Behavior on y { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
+                            Icon {
+                                anchors.centerIn: parent
+                                text: "\uf00a"
+                                font.pixelSize: Math.round(win.isz * 0.46)
+                                tint: item.focused ? Theme.onAccent : Theme.accent
+                            }
                         }
 
                         // Open window count badge
@@ -540,6 +602,10 @@ Variants {
                                 if (dragMoved) { dragMoved = false; return; }
                                 if (m.button === Qt.RightButton) { win.menuKey = win.menuKey === item.modelData.key ? "" : item.modelData.key; return; }
                                 win.menuKey = "";
+                                if (item.isLauncher) {
+                                    Panels.toggle("launcher");
+                                    return;
+                                }
                                 if (m.button === Qt.MiddleButton || !item.running) {
                                     if (item.entry) item.entry.execute(); else Apps.run(item.modelData.id);
                                 } else {
@@ -554,7 +620,7 @@ Variants {
                             visible: ma.containsMouse && !item.running && win.menuKey === "" && !win.isDragging
                             anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.top; bottomMargin: 8 }
                             width: tip.implicitWidth + 20; height: 26; radius: 8; color: Theme.card; border.width: 1; border.color: Theme.border
-                            Label { id: tip; anchors.centerIn: parent; text: item.entry?.name ?? item.modelData.id; font.pixelSize: Theme.fsS + 1 }
+                            Label { id: tip; anchors.centerIn: parent; text: item.isLauncher ? "App Launcher" : (item.entry?.name ?? item.modelData.id); font.pixelSize: Theme.fsS + 1 }
                         }
                         // context menu
                         Rectangle {
@@ -571,11 +637,14 @@ Variants {
                                 id: mcol
                                 anchors { fill: parent; margins: 6 }
                                 Repeater {
-                                    model: menu.visible ? [
+                                    model: menu.visible ? (item.isLauncher ? [
+                                        { t: "Open launcher", g: "\uf00a", a: "launcher" },
+                                        { t: item.modelData.fixedSide ? "Hide launcher" : "Unpin from dock", g: "\uf08d", a: "pin" },
+                                    ] : [
                                         { t: "Open new window", g: "\uf067", a: "new" },
                                         { t: item.modelData.pinned ? "Unpin from dock" : "Pin to dock", g: "\uf08d", a: "pin" },
                                         { t: "Close window" + (item.modelData.tops.length > 1 ? "s" : ""), g: "\uf00d", a: "close", off: !item.running },
-                                    ].filter(x => !x.off) : []
+                                    ].filter(x => !x.off)) : []
                                     delegate: Rectangle {
                                         required property var modelData
                                         width: mcol.width; height: 32; radius: Theme.radiusS
@@ -586,7 +655,8 @@ Variants {
                                         MouseArea { id: mm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 win.menuKey = "";
-                                                if (modelData.a === "new") { if (item.entry) item.entry.execute(); }
+                                                if (modelData.a === "launcher") Panels.toggle("launcher");
+                                                else if (modelData.a === "new") { if (item.entry) item.entry.execute(); }
                                                 else if (modelData.a === "pin") win.togglePin(item.modelData);
                                                 else for (const t of item.modelData.tops) t.close();
                                             } }

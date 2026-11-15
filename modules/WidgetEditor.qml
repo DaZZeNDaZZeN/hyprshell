@@ -1818,6 +1818,57 @@ Variants {
                                                 Label { Layout.fillWidth: true; text: "Hide Widget When Idle" }
                                                 Toggle { checked: win.selWidget?.hideWhenIdle === true; onToggled: v => win.patchSelected({ hideWhenIdle: v }) }
                                             }
+                                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+                                            RowLayout {
+                                                visible: win.selWidget?.showVolume !== false
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Label {
+                                                    readonly property int baseVolStep: Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaVolumeStep || 3) : (Config.o.sliderScrollStep || 3)
+                                                    text: "Volume scroll: " + ((win.selWidget?.volumeScrollStep ?? -1) <= 0 ? ("Global (" + baseVolStep + "%)") : (win.selWidget.volumeScrollStep + "%"))
+                                                    font.pixelSize: Theme.fsS
+                                                    color: Theme.subtext
+                                                    Layout.preferredWidth: 138
+                                                }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    readonly property int baseVolStep: Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaVolumeStep || 3) : (Config.o.sliderScrollStep || 3)
+                                                    value: ((win.selWidget?.volumeScrollStep ?? -1) <= 0 ? baseVolStep : win.selWidget.volumeScrollStep) - 1
+                                                    max: 24
+                                                    onMoved: v => win.patchSelected({ volumeScrollStep: Math.max(1, Math.round(v + 1)) })
+                                                }
+                                                Chip {
+                                                    visible: (win.selWidget?.volumeScrollStep ?? -1) > 0
+                                                    text: "Global"
+                                                    implicitHeight: 22
+                                                    onClicked: win.patchSelected({ volumeScrollStep: -1 })
+                                                }
+                                            }
+                                            RowLayout {
+                                                visible: win.selWidget?.showSeek !== false
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Label {
+                                                    readonly property int baseSeekStep: Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaSeekStep || 5) : (Config.o.mediaSeekStep || 5)
+                                                    text: "Seek scroll: " + ((win.selWidget?.seekScrollStep ?? -1) <= 0 ? ("Global (" + baseSeekStep + "s)") : (win.selWidget.seekScrollStep + "s"))
+                                                    font.pixelSize: Theme.fsS
+                                                    color: Theme.subtext
+                                                    Layout.preferredWidth: 138
+                                                }
+                                                Slider {
+                                                    Layout.fillWidth: true
+                                                    readonly property int baseSeekStep: Config.o.widgetMediaOverrideScroll ? (Config.o.widgetMediaSeekStep || 5) : (Config.o.mediaSeekStep || 5)
+                                                    value: ((win.selWidget?.seekScrollStep ?? -1) <= 0 ? baseSeekStep : win.selWidget.seekScrollStep) - 1
+                                                    max: 59
+                                                    onMoved: v => win.patchSelected({ seekScrollStep: Math.max(1, Math.round(v + 1)) })
+                                                }
+                                                Chip {
+                                                    visible: (win.selWidget?.seekScrollStep ?? -1) > 0
+                                                    text: "Global"
+                                                    implicitHeight: 22
+                                                    onClicked: win.patchSelected({ seekScrollStep: -1 })
+                                                }
+                                            }
                                         }
                                     }
 
